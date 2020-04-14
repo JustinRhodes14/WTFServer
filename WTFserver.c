@@ -154,6 +154,26 @@ void func(int sockfd)
 	}*/
 }
 
+char* readConf(int conFD) {
+	int status = 1;
+	int bytesRead = 0;
+	char* confInfo = "";
+	while (status > 0) {
+		char buffer[101];
+		memset(buffer,'\0',101);
+		int readIn = 0;
+		do {
+			status = read(conFD,buffer,100 - readIn);
+			if (status == 0) {
+				break;
+			}
+			readIn += status;
+		}while (readIn < 100);
+		confInfo = combineString(confInfo,buffer);
+	}
+	return confInfo;
+}
+
 char* substring(char* str, int start, int end) {
 	char* result;
 	if (end == -1) {
