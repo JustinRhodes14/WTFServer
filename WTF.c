@@ -4,7 +4,6 @@
 #include <string.h> 
 #include <sys/socket.h> 
 #define MAX 80 
-#define PORT 8080 
 #define SA struct sockaddr 
 void func(int sockfd) 
 { 
@@ -27,11 +26,18 @@ void func(int sockfd)
     } 
 } 
   
-int main(int argc, char** argc) 
+int main(int argc, char** argv) 
 { 
+	if (argc == 4) {
+		
+	}
     int sockfd, connfd; 
     struct sockaddr_in servaddr, cli; 
-  
+  	if (argc != 2) {
+		printf("Invalid port\n");
+		exit(0);
+	}
+	int port = atoi (argv[1]);
     // socket create and varification 
     sockfd = socket(AF_INET, SOCK_STREAM, 0); 
     if (sockfd == -1) { 
@@ -45,7 +51,7 @@ int main(int argc, char** argc)
     // assign IP, PORT 
     servaddr.sin_family = AF_INET; 
     servaddr.sin_addr.s_addr = inet_addr("127.0.0.1"); 
-    servaddr.sin_port = htons(PORT); 
+    servaddr.sin_port = htons(port); 
   
     // connect the client socket to server socket 
     if (connect(sockfd, (SA*)&servaddr, sizeof(servaddr)) != 0) { 
@@ -60,4 +66,22 @@ int main(int argc, char** argc)
   
     // close the socket 
     close(sockfd); 
-} 
+}
+
+void configure(char* ip, char* port) {
+	int fd;
+	fd = open ("./.configure", O_RDWRONLY | O_CREAT | O_TRUNC,00600);
+	writeTo(fd,ip);
+	writeTo(fd,"\n\0");
+	writeTo(fd,port);
+}
+
+void writeTo(int fd, char* word) {
+	int bytesWritten = 0;
+	int bytestoWrite = strlen(word);
+	while (bytesWritten < bytestoWrite) {
+		bytesWritten = write(fd,word,bytestoWrite - bytesWritten);
+	}
+}
+
+

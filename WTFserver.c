@@ -6,7 +6,6 @@
 #include <sys/socket.h> 
 #include <sys/types.h> 
 #define MAX 80 
-#define PORT 8080 
 #define SA struct sockaddr 
   
 // Function designed for chat between client and server. 
@@ -42,6 +41,13 @@ void func(int sockfd)
 // Driver function 
 int main(int argc, char** argv) 
 { 
+	if (argc != 2) {
+		printf("Fatal Error: Only input one argument (one port number)\n");
+		exit(0);
+	}
+	
+	
+	int port = atoi(argv[1]);
     int sockfd, connfd, len; 
     struct sockaddr_in servaddr, cli; 
   
@@ -58,7 +64,7 @@ int main(int argc, char** argv)
     // assign IP, PORT 
     servaddr.sin_family = AF_INET; 
     servaddr.sin_addr.s_addr = htonl(INADDR_ANY); 
-    servaddr.sin_port = htons(PORT); 
+    servaddr.sin_port = htons(port); 
   
     // Binding newly created socket to given IP and verification 
     if ((bind(sockfd, (SA*)&servaddr, sizeof(servaddr))) != 0) { 
@@ -74,7 +80,7 @@ int main(int argc, char** argv)
         exit(0); 
     } 
     else
-        printf("Server listening..\n"); 
+        printf("Server listening on port %d\n", port); 
     len = sizeof(cli); 
   
     // Accept the data packet from client and verification 
