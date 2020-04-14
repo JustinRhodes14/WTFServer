@@ -21,44 +21,42 @@ void writeTo(int,char*);
 
 int main(int argc, char** argv) 
 { 
-	if (argc == 4) {
-		
+	if (compareString("configure\0",argv[1]) == 0) {
+		configure(argv[2],argv[3]);
+		printf("Successfully created .configure file\n");
+		return 0;
 	}
-    int sockfd, connfd; 
-    struct sockaddr_in servaddr, cli; 
-  	if (argc != 2) {
-		printf("Invalid port\n");
-		exit(0);
-	}
+	int sockfd, connfd; 
+	struct sockaddr_in servaddr, cli; 
 	int port = atoi (argv[1]);
-    // socket create and varification 
-    sockfd = socket(AF_INET, SOCK_STREAM, 0); 
-    if (sockfd == -1) { 
-        printf("socket creation failed...\n"); 
-        exit(0); 
-    } 
-    else
-        printf("Socket successfully created..\n"); 
-    bzero(&servaddr, sizeof(servaddr)); 
-  
-    // assign IP, PORT 
-    servaddr.sin_family = AF_INET; 
-    servaddr.sin_addr.s_addr = inet_addr("127.0.0.1"); 
-    servaddr.sin_port = htons(port); 
-  
-    // connect the client socket to server socket 
-    if (connect(sockfd, (SA*)&servaddr, sizeof(servaddr)) != 0) { 
-        printf("connection with the server failed...\n"); 
-        exit(0); 
-    } 
-    else
-        printf("connected to the server..\n"); 
-  
-    // function for chat 
-    func(sockfd); 
-  
-    // close the socket 
-    close(sockfd); 
+	// socket create and varification 
+	sockfd = socket(AF_INET, SOCK_STREAM, 0); 
+	if (sockfd == -1) { 
+		printf("socket creation failed...\n"); 
+		exit(0); 
+	} 
+	else
+		printf("Socket successfully created..\n"); 
+	bzero(&servaddr, sizeof(servaddr)); 
+
+	// assign IP, PORT 
+	servaddr.sin_family = AF_INET; 
+	servaddr.sin_addr.s_addr = inet_addr("127.0.0.1"); 
+	servaddr.sin_port = htons(port); 
+
+	// connect the client socket to server socket 
+	if (connect(sockfd, (SA*)&servaddr, sizeof(servaddr)) != 0) { 
+		printf("connection with the server failed...\n"); 
+		exit(0); 
+	} 
+	else
+		printf("connected to the server..\n"); 
+
+	// function for chat 
+	func(sockfd); 
+
+	// close the socket 
+	close(sockfd); 
 }
 
 char* combineString(char* str1, char* str2) {
@@ -94,7 +92,7 @@ int compareString(char* str1, char* str2) {
 		shorter = 0;//equal length
 		len = len1;
 	}
-	
+
 	int i;
 	for ( i = 0; i < len; i++) {
 		if (str1[i] != str2[i]) {
@@ -111,7 +109,7 @@ int compareString(char* str1, char* str2) {
 
 void configure(char* ip, char* port) {
 	int fd;
-	fd = open ("./.configure", O_RDWRONLY | O_CREAT | O_TRUNC,00600);
+	fd = open ("./.configure", O_WRONLY | O_CREAT | O_TRUNC,00600);
 	writeTo(fd,ip);
 	writeTo(fd,"\n\0");
 	writeTo(fd,port);
@@ -128,25 +126,28 @@ char* copyString(char* to, char* from) {
 	return to;
 }
 
-void func(int sockfd) 
+void func(int sockfd,char* action, char* projname,char* fname) 
 { 
-    char buff[MAX]; 
-    int n; 
-    for (;;) { 
-        bzero(buff, sizeof(buff)); 
-        printf("Enter the string : "); 
-        n = 0; 
-        while ((buff[n++] = getchar()) != '\n') 
-            ; 
-        write(sockfd, buff, sizeof(buff)); 
-        bzero(buff, sizeof(buff)); 
-        read(sockfd, buff, sizeof(buff)); 
-        printf("From Server : %s", buff); 
-        if ((strncmp(buff, "exit", 4)) == 0) { 
-            printf("Client Exit...\n"); 
-            break; 
-        } 
-    } 
+	//char buff[MAX]; 
+	//int n; 
+	writeTo(sockfd,action);
+	writeTo(sockfd,"\n");
+	writeTo(sockfd,projname);
+	/*for (;;) { 
+		bzero(buff, sizeof(buff)); 
+		printf("Enter the string : "); 
+		n = 0; 
+		while ((buff[n++] = getchar()) != '\n') 
+			; 
+		write(sockfd, buff, sizeof(buff)); 
+		bzero(buff, sizeof(buff)); 
+		read(sockfd, buff, sizeof(buff)); 
+		printf("From Server : %s", buff); 
+		if ((strncmp(buff, "exit", 4)) == 0) { 
+			printf("Client Exit...\n"); 
+			break; 
+		} 
+	} */
 } 
 
 char* substring(char* str, int start, int end) {
