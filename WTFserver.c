@@ -1,43 +1,23 @@
-#include <stdio.h> 
 #include <netdb.h> 
-#include <netinet/in.h> 
+#include <stdio.h> 
 #include <stdlib.h> 
 #include <string.h> 
-#include <sys/socket.h> 
-#include <sys/types.h> 
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <dirent.h>
+#include <limits.h>
+#include <math.h>
 #define MAX 80 
 #define SA struct sockaddr 
-  
-// Function designed for chat between client and server. 
-void func(int sockfd) 
-{ 
-    char buff[MAX]; 
-    int n; 
-    // infinite loop for chat 
-    for (;;) { 
-        bzero(buff, MAX); 
-  
-        // read the message from client and copy it in buffer 
-        read(sockfd, buff, sizeof(buff)); 
-        // print buffer which contains the client contents 
-        printf("From client: %s\t To client : ", buff); 
-        bzero(buff, MAX); 
-        n = 0; 
-        // copy server message in the buffer 
-        while ((buff[n++] = getchar()) != '\n') 
-            ; 
-  
-        // and send that buffer to client 
-        write(sockfd, buff, sizeof(buff)); 
-  
-        // if msg contains "Exit" then server exit and chat ended. 
-        if (strncmp("exit", buff, 4) == 0) { 
-            printf("Server Exit...\n"); 
-            break; 
-        } 
-    } 
-} 
-  
+char* combineString(char*,char*);
+int compareString(char*,char*);
+char* copyString(char*,char*);
+void func(int);
+char* substring(char*,int,int);
+void writeTo(int,char*);
+
 // Driver function 
 int main(int argc, char** argv) 
 { 
@@ -98,3 +78,107 @@ int main(int argc, char** argv)
     // After chatting close the socket 
     close(sockfd); 
 } 
+
+int compareString(char* str1, char* str2) {
+	int len1 = strlen(str1);
+	int len2 = strlen(str2);
+	int shorter = 0;
+	int len = len1;
+	if (len1 > len2) {
+		shorter = 1;//first one is shorter
+		len = len1;
+	} else if (len2 < len1) {
+		shorter = 2;//second one is shorter
+		len = len2;
+	} else {
+		shorter = 0;//equal length
+		len = len1;
+	}
+
+	int i;
+	for ( i = 0; i < len; i++) {
+		if (str1[i] != str2[i]) {
+			return ((int)str1[i] - (int)str2[i]);//negative if str1 is lesser, positive if str1 is greater
+		}	
+	}
+	if (len1 < len2) {
+		return -1;
+	} else if (len2 < len1) {
+		return 1;
+	}
+	return 0;//equal strings
+}
+
+char* copyString(char* to, char* from) {
+	int length = strlen(from);
+	to = (char*)malloc(length * sizeof(char) + 1);
+	memset(to,'\0',(length+1));
+	int i;
+	for ( i = 0; i < length; i++) {
+		to[i] = from[i];
+	}
+	return to;
+}
+
+// Function designed for chat between client and server. 
+void func(int sockfd) 
+{ 
+    char buff[MAX]; 
+    int n; 
+    // infinite loop for chat 
+    for (;;) { 
+        bzero(buff, MAX); 
+  
+        // read the message from client and copy it in buffer 
+        read(sockfd, buff, sizeof(buff)); 
+        // print buffer which contains the client contents 
+        printf("From client: %s\t To client : ", buff); 
+        bzero(buff, MAX); 
+        n = 0; 
+        // copy server message in the buffer 
+        while ((buff[n++] = getchar()) != '\n') 
+            ; 
+  
+        // and send that buffer to client 
+        write(sockfd, buff, sizeof(buff)); 
+  
+        // if msg contains "Exit" then server exit and chat ended. 
+        if (strncmp("exit", buff, 4) == 0) { 
+            printf("Server Exit...\n"); 
+            break; 
+        } 
+    } 
+}
+
+char* substring(char* str, int start, int end) {
+	char* result;
+	if (end == -1) {
+		int length = strlen(str);
+		result = (char*)malloc((length-start)*sizeof(char) + 1);
+		memset(result,'\0',(length-start + 1));
+		int i;
+		int j = 0;
+		for ( i = start; i < length; i++) {
+			result[j] = str[i];
+			j++;
+		}
+	} else {
+		result = (char*)malloc((end-start)*sizeof(char) + 1);
+		memset(result,'\0',(end-start + 1));
+		int i;
+		int j = 0;
+		for ( i = start; i < end; i++) {
+			result[j] = str[i];
+			j++;
+		}	
+	}
+	return result;
+}
+
+void writeTo(int fd, char* word) {
+	int bytesWritten = 0;
+	int bytestoWrite = strlen(word);
+	while (bytesWritten < bytestoWrite) {
+		bytesWritten = write(fd,word,bytestoWrite - bytesWritten);
+	}
+}
