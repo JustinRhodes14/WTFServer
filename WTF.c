@@ -14,6 +14,7 @@
 char* combineString(char*,char*);
 int compareString(char*,char*);
 void configure(char*,char*);
+char* copyString(char*,char*);
 void func(int);
 char* substring(char*,int,int);
 void writeTo(int,char*);
