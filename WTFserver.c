@@ -14,7 +14,9 @@
 char* combineString(char*,char*);
 int compareString(char*,char*);
 char* copyString(char*,char*);
+int extractInfo(char*); 
 void func(int);
+char* readSock(int); 
 char* substring(char*,int,int);
 void writeTo(int,char*);
 
@@ -77,7 +79,25 @@ int main(int argc, char** argv)
 
 	// After chatting close the socket 
 	close(sockfd); 
-} 
+}
+ 
+char* combineString(char* str1, char* str2) {
+	int len1 = strlen(str1);
+	int len2 = strlen(str2);
+	char* result = (char*)malloc((len1+len2)*sizeof(char) + 1);
+	memset(result,'\0',(len1+len2+1));
+	int i;
+	int j = 0;
+	for ( i = 0; i < len1; i++) {
+		result[i] = str1[i];
+		j++;
+	}
+	for ( i = 0; i < len2; i++) {
+		result[j] = str2[i];
+		j++;
+	}
+	return result;
+}
 
 int compareString(char* str1, char* str2) {
 	int len1 = strlen(str1);
@@ -120,13 +140,23 @@ char* copyString(char* to, char* from) {
 	return to;
 }
 
+int extractInfo(char* word) {
+	int counter = 0;
+	while (word[counter] != '\n') {
+		counter++;
+	}
+	return counter;
+}
 // Function designed for chat between client and server. 
 void func(int sockfd) 
 { 
-	char buffer[256];
-	memset(buffer,'\0',256);
-	read(sockfd,buffer,255);
-	printf("From client: %s\n",buffer);
+	char* clientInfo = readSock(sockfd);
+	printf("From client: %s\n",clientInfo);
+	int split = extractInfo(clientInfo);
+	
+	char* action = substring(clientInfo,0,split);
+	char* project = substring(clientInfo,split+1,-1);
+	int nFD = open(project,O_WRONLY | O_CREAT | O_TRUNC,00600);
 	//char buff[MAX]; 
 	//int n; 
 	// infinite loop for chat 
@@ -154,7 +184,7 @@ void func(int sockfd)
 	}*/
 }
 
-char* readConf(int conFD) {
+char* readSock(int sockFD) {
 	int status = 1;
 	int bytesRead = 0;
 	char* confInfo = "";
@@ -163,7 +193,7 @@ char* readConf(int conFD) {
 		memset(buffer,'\0',101);
 		int readIn = 0;
 		do {
-			status = read(conFD,buffer,100 - readIn);
+			status = read(sockFD,buffer,100 - readIn);
 			if (status == 0) {
 				break;
 			}

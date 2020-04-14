@@ -150,10 +150,10 @@ int extractInfo(char* word) {
 void func(int sockfd,char* action, char* projname,char* fname) 
 { 
 	//char buff[MAX]; 
-	//int n; 
-	writeTo(sockfd,action);
-	writeTo(sockfd,"\n");
-	writeTo(sockfd,projname);
+	//int n;
+	char* total = combineString(action,"\n\0");
+	total = combineString(total,projname); 
+	writeTo(sockfd,total);
 	/*for (;;) { 
 		bzero(buff, sizeof(buff)); 
 		printf("Enter the string : "); 
