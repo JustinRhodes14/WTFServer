@@ -9,13 +9,16 @@
 #include <dirent.h>
 #include <limits.h>
 #include <math.h>
+#include <stdbool.h>
 #define MAX 80 
 #define SA struct sockaddr 
 char* combineString(char*,char*);
 int compareString(char*,char*);
 void configure(char*,char*);
 char* copyString(char*,char*);
-void func(int);
+int extractInfo(char*);
+void func(int,char*,char*,char*);
+char* readConf(int);
 char* substring(char*,int,int);
 void writeTo(int,char*);
 
@@ -26,9 +29,19 @@ int main(int argc, char** argv)
 		printf("Successfully created .configure file\n");
 		return 0;
 	}
+	int conf = open("./.configure",O_RDONLY);
+	if (conf == -1) {
+		printf("Fatal Error:No configure file present\n");
+		exit(0);
+	}
+	
+	char* confInfo = readConf(conf);
+	int split = extractInfo(confInfo);
+	char* ip = substring(confInfo,0,split);
+	int port = atoi(substring(confInfo,split+1,-1));
+	printf("IP: %s, PORT: %d\n",ip,port);
 	int sockfd, connfd; 
 	struct sockaddr_in servaddr, cli; 
-	int port = atoi (argv[1]);
 	// socket create and varification 
 	sockfd = socket(AF_INET, SOCK_STREAM, 0); 
 	if (sockfd == -1) { 
@@ -41,7 +54,7 @@ int main(int argc, char** argv)
 
 	// assign IP, PORT 
 	servaddr.sin_family = AF_INET; 
-	servaddr.sin_addr.s_addr = inet_addr("127.0.0.1"); 
+	servaddr.sin_addr.s_addr = inet_addr(ip); 
 	servaddr.sin_port = htons(port); 
 
 	// connect the client socket to server socket 
@@ -53,7 +66,7 @@ int main(int argc, char** argv)
 		printf("connected to the server..\n"); 
 
 	// function for chat 
-	func(sockfd); 
+	func(sockfd,argv[1],argv[2],NULL); 
 
 	// close the socket 
 	close(sockfd); 
@@ -126,6 +139,14 @@ char* copyString(char* to, char* from) {
 	return to;
 }
 
+int extractInfo(char* word) {
+	int counter = 0;
+	while (word[counter] != '\n') {
+		counter++;
+	}
+	return counter;
+}
+
 void func(int sockfd,char* action, char* projname,char* fname) 
 { 
 	//char buff[MAX]; 
@@ -149,6 +170,26 @@ void func(int sockfd,char* action, char* projname,char* fname)
 		} 
 	} */
 } 
+
+char* readConf(int conFD) {
+	int status = 1;
+	int bytesRead = 0;
+	char* confInfo = "";
+	while (status > 0) {
+		char buffer[101];
+		memset(buffer,'\0',101);
+		int readIn = 0;
+		do {
+			status = read(conFD,buffer,100 - readIn);
+			if (status == 0) {
+				break;
+			}
+			readIn += status;
+		}while (readIn < 100);
+		confInfo = combineString(confInfo,buffer);
+	}
+	return confInfo;
+}
 
 char* substring(char* str, int start, int end) {
 	char* result;
