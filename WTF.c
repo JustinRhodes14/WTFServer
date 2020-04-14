@@ -11,9 +11,11 @@
 #include <math.h>
 #define MAX 80 
 #define SA struct sockaddr 
+char* combineString(char*,char*);
 int compareString(char*,char*);
 void configure(char*,char*);
 void func(int);
+char* substring(char*,int,int);
 void writeTo(int,char*);
 
 int main(int argc, char** argv) 
@@ -57,6 +59,25 @@ int main(int argc, char** argv)
     // close the socket 
     close(sockfd); 
 }
+
+char* combineString(char* str1, char* str2) {
+	int len1 = strlen(str1);
+	int len2 = strlen(str2);
+	char* result = (char*)malloc((len1+len2)*sizeof(char) + 1);
+	memset(result,'\0',(len1+len2+1));
+	int i;
+	int j = 0;
+	for ( i = 0; i < len1; i++) {
+		result[i] = str1[i];
+		j++;
+	}
+	for ( i = 0; i < len2; i++) {
+		result[j] = str2[i];
+		j++;
+	}
+	return result;
+}
+
 int compareString(char* str1, char* str2) {
 	int len1 = strlen(str1);
 	int len2 = strlen(str2);
@@ -86,12 +107,24 @@ int compareString(char* str1, char* str2) {
 	}
 	return 0;//equal strings
 }
+
 void configure(char* ip, char* port) {
 	int fd;
 	fd = open ("./.configure", O_RDWRONLY | O_CREAT | O_TRUNC,00600);
 	writeTo(fd,ip);
 	writeTo(fd,"\n\0");
 	writeTo(fd,port);
+}
+
+char* copyString(char* to, char* from) {
+	int length = strlen(from);
+	to = (char*)malloc(length * sizeof(char) + 1);
+	memset(to,'\0',(length+1));
+	int i;
+	for ( i = 0; i < length; i++) {
+		to[i] = from[i];
+	}
+	return to;
 }
 
 void func(int sockfd) 
@@ -114,6 +147,31 @@ void func(int sockfd)
         } 
     } 
 } 
+
+char* substring(char* str, int start, int end) {
+	char* result;
+	if (end == -1) {
+		int length = strlen(str);
+		result = (char*)malloc((length-start)*sizeof(char) + 1);
+		memset(result,'\0',(length-start + 1));
+		int i;
+		int j = 0;
+		for ( i = start; i < length; i++) {
+			result[j] = str[i];
+			j++;
+		}
+	} else {
+		result = (char*)malloc((end-start)*sizeof(char) + 1);
+		memset(result,'\0',(end-start + 1));
+		int i;
+		int j = 0;
+		for ( i = start; i < end; i++) {
+			result[j] = str[i];
+			j++;
+		}	
+	}
+	return result;
+}
 
 void writeTo(int fd, char* word) {
 	int bytesWritten = 0;
