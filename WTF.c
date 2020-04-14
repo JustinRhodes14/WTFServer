@@ -2,9 +2,19 @@
 #include <stdio.h> 
 #include <stdlib.h> 
 #include <string.h> 
-#include <sys/socket.h> 
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <dirent.h>
+#include <limits.h>
+#include <math.h>
 #define MAX 80 
 #define SA struct sockaddr 
+int compareString(char*,char*);
+void configure(char*,char*);
+void func(int);
+void writeTo(int,char*);
 
 int main(int argc, char** argv) 
 { 
