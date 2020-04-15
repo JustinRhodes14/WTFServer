@@ -1,5 +1,4 @@
 #include <netdb.h> 
-#include <stdio.h> 
 #include <stdlib.h> 
 #include <string.h> 
 #include <sys/socket.h>
@@ -9,11 +8,13 @@
 #include <dirent.h>
 #include <limits.h>
 #include <math.h>
-#define MAX 80 
+#include <stdio.h>
+#include <unistd.h>
 #define SA struct sockaddr 
 char* combineString(char*,char*);
 int compareString(char*,char*);
 char* copyString(char*,char*);
+void create(char*);
 int extractInfo(char*); 
 void func(int);
 char* readSock(int); 
@@ -140,6 +141,15 @@ char* copyString(char* to, char* from) {
 	return to;
 }
 
+void create(char* projectName) {
+	
+	struct stat st = {0};
+	
+	if (stat(projectName, &st) == -1) {
+		mkdir(projectName,0700);
+	}
+}
+
 int extractInfo(char* word) {
 	int counter = 0;
 	while (word[counter] != '\n') {
@@ -150,24 +160,30 @@ int extractInfo(char* word) {
 // Function designed for chat between client and server. 
 void func(int sockfd) 
 { 
+	char buffer[256];
 	char* clientInfo = readSock(sockfd);
 	printf("From client: %s\n",clientInfo);
 	int split = extractInfo(clientInfo);
 	
 	char* action = substring(clientInfo,0,split);
 	char* project = substring(clientInfo,split+1,-1);
-	int nFD = open(project,O_WRONLY | O_CREAT | O_TRUNC,00600);
-	//char buff[MAX]; 
-	//int n; 
+	
+	if (compareString("create\0",action) == 0) {
+		create(project);
+		write(sockfd,"Successfully initialized server and client project\n",49);
+	}
+	/*
+	char buff[80]; 
+	int n; 
 	// infinite loop for chat 
-	/*for (;;) { 
-		bzero(buff, MAX); 
+	for (;;) { 
+		bzero(buff, 80); 
 
 		// read the message from client and copy it in buffer 
 		read(sockfd, buff, sizeof(buff)); 
 		// print buffer which contains the client contents 
 		printf("From client: %s\t To client : ", buff); 
-		bzero(buff, MAX); 
+		bzero(buff, 80); 
 		n = 0; 
 		// copy server message in the buffer 
 		while ((buff[n++] = getchar()) != '\n') 

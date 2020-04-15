@@ -16,8 +16,9 @@ char* combineString(char*,char*);
 int compareString(char*,char*);
 void configure(char*,char*);
 char* copyString(char*,char*);
+void create(char*);
 int extractInfo(char*);
-void func(int,char*,char*,char*);
+void func(int,char*,char*,char*,int);
 char* readConf(int);
 char* substring(char*,int,int);
 void writeTo(int,char*);
@@ -66,8 +67,9 @@ int main(int argc, char** argv)
 		printf("connected to the server..\n"); 
 
 	// function for chat 
-	func(sockfd,argv[1],argv[2],NULL); 
-
+	if (argc == 3) {
+		func(sockfd,argv[1],argv[2],NULL,-1); 
+	}
 	// close the socket 
 	close(sockfd); 
 }
@@ -139,6 +141,14 @@ char* copyString(char* to, char* from) {
 	return to;
 }
 
+void create(char* projectName) {
+	struct stat st = {0};
+	
+	if (stat(projectName,&st) == -1) {
+		mkdir(projectName,0700);
+	}
+}
+
 int extractInfo(char* word) {
 	int counter = 0;
 	while (word[counter] != '\n') {
@@ -147,13 +157,20 @@ int extractInfo(char* word) {
 	return counter;
 }
 
-void func(int sockfd,char* action, char* projname,char* fname) 
+void func(int sockfd,char* action, char* projname,char* fname,int version) 
 { 
-	//char buff[MAX]; 
-	//int n;
-	char* total = combineString(action,"\n\0");
-	total = combineString(total,projname); 
-	writeTo(sockfd,total);
+	//char buff[80]; 
+	char buffer[256];
+	if (compareString("create",action) == 0) {
+		char* total = combineString(action,"\n\0");
+		total = combineString(total,projname); 
+		writeTo(sockfd,total);
+		create(projname);
+		memset(buffer,'\0',256);
+		read(sockfd,buffer,49);
+		printf("%s",buffer);
+	}
+	
 	/*for (;;) { 
 		bzero(buff, sizeof(buff)); 
 		printf("Enter the string : "); 
