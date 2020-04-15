@@ -160,7 +160,6 @@ int extractInfo(char* word) {
 // Function designed for chat between client and server. 
 void func(int sockfd) 
 { 
-	char buffer[256];
 	char* clientInfo = readSock(sockfd);
 	printf("From client: %s\n",clientInfo);
 	int split = extractInfo(clientInfo);
@@ -170,7 +169,8 @@ void func(int sockfd)
 	
 	if (compareString("create\0",action) == 0) {
 		create(project);
-		write(sockfd,"Successfully initialized server and client project\n",49);
+		char* message = "Successfully initialized project\n\0";
+		writeTo(sockfd,message);	
 	}
 	/*
 	char buff[80]; 

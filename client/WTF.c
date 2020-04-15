@@ -10,7 +10,8 @@
 #include <limits.h>
 #include <math.h>
 #include <stdbool.h>
-#define MAX 80 
+#include <signal.h>
+#include <unistd.h>
 #define SA struct sockaddr 
 char* combineString(char*,char*);
 int compareString(char*,char*);
@@ -20,11 +21,24 @@ void create(char*);
 int extractInfo(char*);
 void func(int,char*,char*,char*,int);
 char* readConf(int);
+void stopSig(int);
 char* substring(char*,int,int);
 void writeTo(int,char*);
 
+
+int sockfd, connfd; 
+
+void stopSig(int signum) { 
+	printf("\nStopping connection to server\n");
+	(void) signal(SIGINT,SIG_DFL);
+	close(sockfd);
+	exit(0);
+}
+
 int main(int argc, char** argv) 
-{ 
+{ 	
+	
+	(void) signal(SIGINT,stopSig);
 	if (compareString("configure\0",argv[1]) == 0) {
 		configure(argv[2],argv[3]);
 		printf("Successfully created .configure file\n");
@@ -41,7 +55,6 @@ int main(int argc, char** argv)
 	char* ip = substring(confInfo,0,split);
 	int port = atoi(substring(confInfo,split+1,-1));
 	printf("IP: %s, PORT: %d\n",ip,port);
-	int sockfd, connfd; 
 	struct sockaddr_in servaddr, cli; 
 	// socket create and varification 
 	sockfd = socket(AF_INET, SOCK_STREAM, 0); 
@@ -70,7 +83,7 @@ int main(int argc, char** argv)
 	if (argc == 3) {
 		func(sockfd,argv[1],argv[2],NULL,-1); 
 	}
-	// close the socket 
+	// close the socket
 	close(sockfd); 
 }
 
@@ -166,9 +179,8 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 		total = combineString(total,projname); 
 		writeTo(sockfd,total);
 		create(projname);
-		memset(buffer,'\0',256);
-		read(sockfd,buffer,49);
-		printf("%s",buffer);
+		char* message = readConf(sockfd);
+		printf("Message: %s\n",message);
 	}
 	
 	/*for (;;) { 
