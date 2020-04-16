@@ -16,7 +16,7 @@ int compareString(char*,char*);
 char* copyString(char*,char*);
 void create(char*);
 int extractInfo(char*); 
-void func(int);
+void func(int connfd, int sockfd, struct sockaddr_in cli, int len); 
 char* readSock(int); 
 char* substring(char*,int,int);
 void writeTo(int,char*);
@@ -65,7 +65,7 @@ int main(int argc, char** argv)
 	else
 		printf("Server listening on port %d\n", port); 
 	len = sizeof(cli); 
-
+	//wrap accept in a while loop (wrap accept and func call in while loop
 	// Accept the data packet from client and verification 
 	connfd = accept(sockfd, (SA*)&cli, &len); 
 	if (connfd < 0) { 
@@ -74,12 +74,11 @@ int main(int argc, char** argv)
 	} 
 	else
 		printf("server acccept the client...\n"); 
-
+	//also make a signal handler to stop the server
 	// Function for chatting between client and server 
-	func(connfd); 
+	func(sockfd,connfd,cli,len); 
 
 	// After chatting close the socket 
-	close(sockfd); 
 }
  
 char* combineString(char* str1, char* str2) {
@@ -158,7 +157,7 @@ int extractInfo(char* word) {
 	return counter;
 }
 // Function designed for chat between client and server. 
-void func(int sockfd) 
+void func(int connfd, int sockfd, struct sockaddr_in cli, int len) 
 { 
 	char* clientInfo = readSock(sockfd);
 	printf("From client: %s\n",clientInfo);
@@ -169,8 +168,9 @@ void func(int sockfd)
 	
 	if (compareString("create\0",action) == 0) {
 		create(project);
+		connfd = accept(sockfd, (SA*)&cli, &len); 
 		char* message = "Successfully initialized project\n\0";
-		writeTo(sockfd,message);	
+		send(sockfd,message,sizeof(message),0);
 	}
 	/*
 	char buff[80]; 

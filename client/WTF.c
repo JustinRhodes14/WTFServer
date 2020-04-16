@@ -179,8 +179,10 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 		total = combineString(total,projname); 
 		writeTo(sockfd,total);
 		create(projname);
-		char* message = readConf(sockfd);
-		printf("Message: %s\n",message);
+		recv(sockfd,&buffer,sizeof(buffer),0);
+		printf("%s\n",buffer);
+		//char* message = readConf(sockfd);
+		//printf("Message: %s\n",message);
 	}
 	
 	/*for (;;) { 
