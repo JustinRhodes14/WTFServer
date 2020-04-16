@@ -194,8 +194,8 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 
 		write(sockfd, newBuff, strlen(newBuff));
 	}
-	/*
-	char buffer[256];
+	
+	/*char buffer[256];
 	if (compareString("create",action) == 0) {
 		char* total = combineString(action,"\n\0");
 		total = combineString(total,projname); 

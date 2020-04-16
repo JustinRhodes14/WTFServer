@@ -188,8 +188,8 @@ void func(int connfd, int sockfd, struct sockaddr_in cli, int len)
 		printf("new buff: %s\n", buff);
 	}
 
-	/*
-	   char* clientInfo = readSock(sockfd);
+	
+	/* char* clientInfo = readSock(sockfd);
 	   printf("From client: %s\n",clientInfo);
 	   int split = extractInfo(clientInfo);
 
