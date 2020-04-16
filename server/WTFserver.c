@@ -8,22 +8,35 @@
 #include <dirent.h>
 #include <limits.h>
 #include <math.h>
+#include <signal.h>
 #include <stdio.h>
 #include <unistd.h>
 #define SA struct sockaddr 
 char* combineString(char*,char*);
 int compareString(char*,char*);
 char* copyString(char*,char*);
-void create(char*);
+int create(char*);
 int extractInfo(char*); 
-void func(int connfd, int sockfd, struct sockaddr_in cli, int len); 
+void func(int); 
 char* readSock(int); 
+void stopSig(int);
 char* substring(char*,int,int);
 void writeTo(int,char*);
+
+
+int sockfd, connfd, len; 
+
+void stopSig(int signum) {
+	printf("\nStopping connection to server and client\n");
+	(void) signal(SIGINT,SIG_DFL);
+	close(sockfd);
+	exit(0);
+}
 
 // Driver function 
 int main(int argc, char** argv) 
 { 
+	(void) signal(SIGINT,stopSig);
 	if (argc != 2) {
 		printf("Fatal Error: Only input one argument (one port number)\n");
 		exit(0);
@@ -31,7 +44,6 @@ int main(int argc, char** argv)
 
 
 	int port = atoi(argv[1]);
-	int sockfd, connfd, len; 
 	struct sockaddr_in servaddr, cli; 
 
 	// socket create and verification 
@@ -76,9 +88,12 @@ int main(int argc, char** argv)
 		printf("server acccept the client...\n"); 
 	//also make a signal handler to stop the server
 	// Function for chatting between client and server 
-	func(sockfd,connfd,cli,len); 
-
+	while (!(connfd < 0)) {		
+		func(connfd); 
+		connfd = accept(sockfd,(SA*)&cli,&len);
+	}
 	// After chatting close the socket 
+	close(sockfd);
 }
  
 char* combineString(char* str1, char* str2) {
@@ -140,37 +155,58 @@ char* copyString(char* to, char* from) {
 	return to;
 }
 
-void create(char* projectName) {
+int create(char* projectName) {
 	
 	struct stat st = {0};
 	
 	if (stat(projectName, &st) == -1) {
 		mkdir(projectName,0700);
+		char* manFile = combineString(projectName,"/.Manifest\0");
+		int manFD = open(manFile, O_WRONLY | O_CREAT | O_TRUNC,00600);
+		writeTo(manFD,"Version 1.0\n");
+		close(manFD);
+		printf("Successfully created %s project on server\n",projectName);
+		return 1;
+	} else {
+		printf("Project name already exists on server\n");
+		return -1;
 	}
 }
 
 int extractInfo(char* word) {
 	int counter = 0;
-	while (word[counter] != '\n') {
+	while (word[counter] != ' ') {
 		counter++;
 	}
 	return counter;
 }
 // Function designed for chat between client and server. 
-void func(int connfd, int sockfd, struct sockaddr_in cli, int len) 
+void func(int sockfd) 
 { 
-	char* clientInfo = readSock(sockfd);
-	printf("From client: %s\n",clientInfo);
-	int split = extractInfo(clientInfo);
+	char buff[256];
+	bzero(buff,256);
 	
-	char* action = substring(clientInfo,0,split);
-	char* project = substring(clientInfo,split+1,-1);
+	read(sockfd,buff,sizeof(buff));
 	
+	int split = extractInfo(buff);
+	
+	char* resultMessage = "";
+	char* action = substring(buff,0,split);
+	char* project = substring(buff,split+1,-1);
 	if (compareString("create\0",action) == 0) {
-		create(project);
-		connfd = accept(sockfd, (SA*)&cli, &len); 
-		char* message = "Successfully initialized project\n\0";
-		send(sockfd,message,sizeof(message),0);
+		int result = create(project);
+		if (result == 1) {
+		resultMessage = combineString(resultMessage, "Successfully initalized project on server and client\n");
+		
+		write(sockfd,resultMessage,strlen(resultMessage));
+		} else {
+			resultMessage = combineString(resultMessage,"Project already exists on server, created local version with proper manifest, udpate required\n\0");
+			char* manFile = combineString(project,"/.Manifest\0");
+			int manFD = open(manFile,O_RDONLY);
+			char* manInfo = readSock(manFD);
+			char* message = combineString(resultMessage,manInfo);
+			write(sockfd,message,strlen(message));
+		}	
 	}
 	/*
 	char buff[80]; 

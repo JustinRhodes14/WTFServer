@@ -81,7 +81,7 @@ int main(int argc, char** argv)
 
 	// function for chat 
 	if (argc == 3) {
-		func(sockfd,argv[1],argv[2],NULL,-1); 
+		func(sockfd,argv[1],argv[2],NULL,-1);
 	}
 	// close the socket
 	close(sockfd); 
@@ -141,6 +141,7 @@ void configure(char* ip, char* port) {
 	writeTo(fd,ip);
 	writeTo(fd,"\n\0");
 	writeTo(fd,port);
+	close(fd);
 }
 
 char* copyString(char* to, char* from) {
@@ -159,6 +160,12 @@ void create(char* projectName) {
 	
 	if (stat(projectName,&st) == -1) {
 		mkdir(projectName,0700);
+		char* manFile = combineString(projectName,"/.Manifest\0");
+		int manFD = open(manFile, O_WRONLY | O_CREAT | O_TRUNC,00600);
+		writeTo(manFD,"Version 1.0\n");
+		close(manFD);
+	} else {
+		printf("Project name already exists on client\n");
 	}
 }
 
@@ -173,16 +180,20 @@ int extractInfo(char* word) {
 void func(int sockfd,char* action, char* projname,char* fname,int version) 
 { 
 	//char buff[80]; 
-	char buffer[256];
+	char buff[256];
+	bzero(buff,sizeof(buff));
 	if (compareString("create",action) == 0) {
-		char* total = combineString(action,"\n\0");
+		char* total = combineString(action," \0");
 		total = combineString(total,projname); 
-		writeTo(sockfd,total);
+		write(sockfd,total,strlen(total));
 		create(projname);
-		recv(sockfd,&buffer,sizeof(buffer),0);
-		printf("%s\n",buffer);
-		//char* message = readConf(sockfd);
-		//printf("Message: %s\n",message);
+		read(sockfd,buff,sizeof(buff));
+		printf("%s\n",buff);
+		int split = extractInfo(buff);
+		char* version = substring(buff,split+1,-1);
+		char* manFile = combineString(projname,"/.Manifest\0");
+		int fd = open(manFile,O_WRONLY | O_CREAT | O_TRUNC,00600);
+		writeTo(fd,version);
 	}
 	
 	/*for (;;) { 
