@@ -172,7 +172,29 @@ int extractInfo(char* word) {
 
 void func(int sockfd,char* action, char* projname,char* fname,int version) 
 { 
-	//char buff[80]; 
+	char buff[80]; 
+	bzero(buff, sizeof(buff)); 
+
+	char* total = combineString(action, " ");
+	total = combineString(total, projname);
+
+	if(compareString("create", action) == 0) { 
+		write(sockfd, total, strlen(total)); 
+		create(projname);
+
+		read(sockfd, buff, sizeof(buff)); 
+		
+		printf("%s\n", buff);
+		if ((strncmp(buff, "Exit", 4)) == 0) { 
+			printf("Client Exit...\n"); 
+		} 
+
+		char* newBuff = "";
+		newBuff = combineString(newBuff, "test message");
+
+		write(sockfd, newBuff, strlen(newBuff));
+	}
+	/*
 	char buffer[256];
 	if (compareString("create",action) == 0) {
 		char* total = combineString(action,"\n\0");
@@ -184,22 +206,7 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 		//char* message = readConf(sockfd);
 		//printf("Message: %s\n",message);
 	}
-	
-	/*for (;;) { 
-		bzero(buff, sizeof(buff)); 
-		printf("Enter the string : "); 
-		n = 0; 
-		while ((buff[n++] = getchar()) != '\n') 
-			; 
-		write(sockfd, buff, sizeof(buff)); 
-		bzero(buff, sizeof(buff)); 
-		read(sockfd, buff, sizeof(buff)); 
-		printf("From Server : %s", buff); 
-		if ((strncmp(buff, "exit", 4)) == 0) { 
-			printf("Client Exit...\n"); 
-			break; 
-		} 
-	} */
+	*/
 } 
 
 char* readConf(int conFD) {

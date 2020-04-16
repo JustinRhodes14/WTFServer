@@ -80,7 +80,7 @@ int main(int argc, char** argv)
 
 	// After chatting close the socket 
 }
- 
+
 char* combineString(char* str1, char* str2) {
 	int len1 = strlen(str1);
 	int len2 = strlen(str2);
@@ -141,9 +141,9 @@ char* copyString(char* to, char* from) {
 }
 
 void create(char* projectName) {
-	
+
 	struct stat st = {0};
-	
+
 	if (stat(projectName, &st) == -1) {
 		mkdir(projectName,0700);
 	}
@@ -151,7 +151,7 @@ void create(char* projectName) {
 
 int extractInfo(char* word) {
 	int counter = 0;
-	while (word[counter] != '\n') {
+	while (word[counter] != ' ') {
 		counter++;
 	}
 	return counter;
@@ -159,45 +159,50 @@ int extractInfo(char* word) {
 // Function designed for chat between client and server. 
 void func(int connfd, int sockfd, struct sockaddr_in cli, int len) 
 { 
-	char* clientInfo = readSock(sockfd);
-	printf("From client: %s\n",clientInfo);
-	int split = extractInfo(clientInfo);
-	
-	char* action = substring(clientInfo,0,split);
-	char* project = substring(clientInfo,split+1,-1);
-	
-	if (compareString("create\0",action) == 0) {
+	char buff[80];
+	char* exitMessage = "";
+	bzero(buff, 80); 
+
+	read(sockfd, buff, sizeof(buff)); 
+
+	printf("From client: %s\n", buff); 
+
+	if(strncmp("create", buff, 6) == 0) {
+		int split = extractInfo(buff);
+		char* action = substring(buff, 0, split);
+		char* project = substring(buff, split+1, -1);
+
 		create(project);
-		connfd = accept(sockfd, (SA*)&cli, &len); 
-		char* message = "Successfully initialized project\n\0";
-		send(sockfd,message,sizeof(message),0);
-	}
-	/*
-	char buff[80]; 
-	int n; 
-	// infinite loop for chat 
-	for (;;) { 
-		bzero(buff, 80); 
-
-		// read the message from client and copy it in buffer 
-		read(sockfd, buff, sizeof(buff)); 
-		// print buffer which contains the client contents 
-		printf("From client: %s\t To client : ", buff); 
-		bzero(buff, 80); 
-		n = 0; 
-		// copy server message in the buffer 
-		while ((buff[n++] = getchar()) != '\n') 
-			; 
-
-		// and send that buffer to client 
-		write(sockfd, buff, sizeof(buff)); 
-
-		// if msg contains "Exit" then server exit and chat ended. 
-		if (strncmp("exit", buff, 4) == 0) { 
+		exitMessage = combineString(exitMessage, "Exit Message: hooligans..");
+		write(sockfd, exitMessage, strlen(exitMessage)); 
+			
+		printf("Succesfully initialized project..\n");
+		if (strncmp("Exit", exitMessage, 4) == 0) { 
 			printf("Server Exit...\n"); 
-			break; 
 		} 
-	}*/
+
+
+		bzero(buff, 80);
+		read(sockfd, buff, sizeof(buff));
+	
+		printf("new buff: %s\n", buff);
+	}
+
+	/*
+	   char* clientInfo = readSock(sockfd);
+	   printf("From client: %s\n",clientInfo);
+	   int split = extractInfo(clientInfo);
+
+	   char* action = substring(clientInfo,0,split);
+	   char* project = substring(clientInfo,split+1,-1);
+
+	   if (compareString("create\0",action) == 0) {
+	   create(project);
+	   connfd = accept(sockfd, (SA*)&cli, &len); 
+	   char* message = "Successfully initialized project\n\0";
+	   send(sockfd,message,sizeof(message),0);
+	   }
+	   */
 }
 
 char* readSock(int sockFD) {
