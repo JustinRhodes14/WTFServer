@@ -17,7 +17,7 @@ char* combineString(char*,char*);
 int compareString(char*,char*);
 void configure(char*,char*);
 char* copyString(char*,char*);
-void create(char*);
+int create(char*);
 int extractInfo(char*);
 void func(int,char*,char*,char*,int);
 char* readConf(int);
@@ -155,7 +155,7 @@ char* copyString(char* to, char* from) {
 	return to;
 }
 
-void create(char* projectName) {
+int create(char* projectName) {
 	struct stat st = {0};
 	
 	if (stat(projectName,&st) == -1) {
@@ -164,8 +164,10 @@ void create(char* projectName) {
 		int manFD = open(manFile, O_WRONLY | O_CREAT | O_TRUNC,00600);
 		writeTo(manFD,"Version 1.0\n");
 		close(manFD);
+		return 1;
 	} else {
 		printf("Project name already exists on client\n");
+		return -1;
 	}
 }
 
@@ -186,14 +188,18 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 		char* total = combineString(action," \0");
 		total = combineString(total,projname); 
 		write(sockfd,total,strlen(total));
-		create(projname);
 		read(sockfd,buff,sizeof(buff));
-		printf("%s\n",buff);
-		int split = extractInfo(buff);
-		char* version = substring(buff,split+1,-1);
-		char* manFile = combineString(projname,"/.Manifest\0");
-		int fd = open(manFile,O_WRONLY | O_CREAT | O_TRUNC,00600);
-		writeTo(fd,version);
+		if (compareString(buff,"Project already exists on server\n\0") == 0) {
+			printf("Project already exists on server, need to clone the project or pick a new name\n");
+		} else {
+			int cr = create(projname);
+			printf("%s\n",buff);
+			int split = extractInfo(buff);
+			char* version = substring(buff,split+1,-1);
+			char* manFile = combineString(projname,"/.Manifest\0");
+			int fd = open(manFile,O_WRONLY | O_CREAT | O_TRUNC,00600);
+			writeTo(fd,version);
+		}
 	}
 	
 	/*for (;;) { 

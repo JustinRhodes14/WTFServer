@@ -197,15 +197,14 @@ void func(int sockfd)
 		int result = create(project);
 		if (result == 1) {
 		resultMessage = combineString(resultMessage, "Successfully initalized project on server and client\n");
-		
+		char* manFile = combineString(project,"/.Manifest\0");
+		int manFD = open(manFile,O_RDONLY);
+		char* manInfo = readSock(manFD);
+		resultMessage = combineString(resultMessage,manInfo);
 		write(sockfd,resultMessage,strlen(resultMessage));
 		} else {
-			resultMessage = combineString(resultMessage,"Project already exists on server, created local version with proper manifest, udpate required\n\0");
-			char* manFile = combineString(project,"/.Manifest\0");
-			int manFD = open(manFile,O_RDONLY);
-			char* manInfo = readSock(manFD);
-			char* message = combineString(resultMessage,manInfo);
-			write(sockfd,message,strlen(message));
+			resultMessage = combineString(resultMessage,"Project already exists on server\n\0");
+			write(sockfd,resultMessage,strlen(resultMessage));
 		}	
 	}
 	/*
