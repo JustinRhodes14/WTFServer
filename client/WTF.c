@@ -92,7 +92,7 @@ int main(int argc, char** argv)
 	// close the socket
 	close(sockfd); 
 }
-
+//file name takes in the path rather than the blank file name
 int add(char* projName, char* filename) {
 	DIR *d;
 	struct dirent *dir;
@@ -111,9 +111,9 @@ int add(char* projName, char* filename) {
 	vName = combineString("/.Manifest/\0",vName);
 	vName = combineString(projName,vName);
 
-	char* path2 = combineString(projName,"/\0");
-	path2 = combineString(path2,filename);
-	int fd = open(path2,O_RDONLY);
+	//char* path2 = combineString(projName,"/\0");
+	//path2 = combineString(path2,filename);
+	int fd = open(filename,O_RDONLY);
 	if (fd == -1) {
 		printf("%s is not a valid file name\n",filename);
 		return -1;
