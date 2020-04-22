@@ -161,7 +161,14 @@ int create(char* projectName) {
 	
 	if (stat(projectName, &st) == -1) {
 		mkdir(projectName,0700);
+		char* histFile = combineString(projectName,"/.History\0");
+		int histFD = open(histFile, O_WRONLY | O_CREAT | O_TRUNC,00600);
 		char* manFile = combineString(projectName,"/.Manifest\0");
+		mkdir(manFile,0700);
+		char* vFile = combineString(manFile,"/.Version\0");
+		int vFD = open(vFile, O_WRONLY | O_CREAT | O_TRUNC, 00600);
+		writeTo(vFD,"1\0");
+		manFile = combineString(manFile, "/Version 1.0\0");
 		int manFD = open(manFile, O_WRONLY | O_CREAT | O_TRUNC,00600);
 		writeTo(manFD,"Version 1.0\n");
 		close(manFD);
@@ -197,7 +204,7 @@ void func(int sockfd)
 		int result = create(project);
 		if (result == 1) {
 		resultMessage = combineString(resultMessage, "Successfully initalized project on server and client\n");
-		char* manFile = combineString(project,"/.Manifest\0");
+		char* manFile = combineString(project,"/.Manifest/Version 1.0\0");
 		int manFD = open(manFile,O_RDONLY);
 		char* manInfo = readSock(manFD);
 		resultMessage = combineString(resultMessage,manInfo);
