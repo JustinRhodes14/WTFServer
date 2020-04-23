@@ -16,6 +16,7 @@ char* combineString(char*,char*);
 int compareString(char*,char*);
 char* copyString(char*,char*);
 int create(char*);
+void destroy(char*);
 int extractInfo(char*); 
 void func(int); 
 char* readSock(int); 
@@ -175,6 +176,31 @@ int create(char* projectName) {
 	}
 }
 
+void destroy(char* path) {
+	DIR* d;
+	struct dirent* dir;
+	if(!(d = opendir(path))) {
+		return;
+	}
+
+	while((dir = readdir(d)) != NULL) {
+		if (dir->d_type == DT_DIR) {
+			if (compareString(dir->d_name, ".") == 0 || compareString(dir->d_name, "..") == 0) {
+				continue;
+			}
+			char* temp = combineString(path, "/");
+			temp = combineString(temp, dir->d_name);
+			destroy(temp);
+			rmdir(temp);
+		} else {
+			char* temp = combineString(path, "/");
+			temp = combineString(temp, dir->d_name);
+			remove(temp);
+		}
+	}
+	closedir(d);
+}
+
 int extractInfo(char* word) {
 	int counter = 0;
 	while (word[counter] != ' ') {
@@ -204,6 +230,21 @@ void func(int sockfd)
 			resultMessage = combineString(resultMessage,"Project already exists on server\n\0");
 			write(sockfd,resultMessage,strlen(resultMessage));
 		}	
+	} else if (compareString("destroy", action) == 0) {
+		project = combineString("./", project);
+		DIR* d;
+		struct dirent* dir;
+		if(!(d = opendir(project))) {
+			resultMessage = combineString(resultMessage, "Destroy failed. Project does not exist on server\n");
+			write(sockfd,resultMessage,strlen(resultMessage));
+			closedir(d);
+		} else {
+			closedir(d);
+			destroy(project);	
+			rmdir(project);
+			resultMessage = combineString(resultMessage, "Successfully destroyed project.\n");
+			write(sockfd,resultMessage,strlen(resultMessage));
+		}
 	}
 	/*
 	char buff[80]; 
