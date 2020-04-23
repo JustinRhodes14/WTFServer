@@ -14,7 +14,8 @@
 #include <signal.h>
 #include <unistd.h>
 #include <openssl/sha.h>
-#define SA struct sockaddr 
+#define SA struct sockaddr
+int addFile(char*,char*); 
 char* combineString(char*,char*);
 int compareString(char*,char*);
 char* compHash(char*);
@@ -26,7 +27,7 @@ void extractMan(char*);
 void func(int,char*,char*,char*,int);
 char* readConf(int);
 char* readManifest(int);
-int remove(char*,char*);
+int removeFile(char*,char*);
 void stopSig(int);
 char* substring(char*,int,int);
 int tableComphash(char*);
@@ -70,11 +71,12 @@ int main(int argc, char** argv)
 		printf("Successfully created .configure file\n");
 		return 0;
 	} else if (compareString("add\0",argv[1]) == 0) {
-		tableInit(250);
-		add(argv[2],argv[3]);
+		tableInit(100);
+		addFile(argv[2],argv[3]);
 		return 0;
 	} else if (compareString("remove\0",argv[1]) == 0) {
-		//remove(argv[2],argv[3]);
+		tableInit(100);
+		removeFile(argv[2],argv[3]);
 		return 0;
 	}
 	int conf = open("./.configure",O_RDONLY);
@@ -120,7 +122,7 @@ int main(int argc, char** argv)
 	close(sockfd); 
 }
 //file name takes in the path rather than the blank file name
-int add(char* projName, char* filename) {
+int addFile(char* projName, char* filename) {
 	DIR *d;
 	struct dirent *dir;
 	if (!(d = opendir(projName))) {
@@ -154,7 +156,6 @@ int add(char* projName, char* filename) {
 	char* toHash = readConf(fd);
 	hashedStuff = combineString(hashedStuff,compHash(toHash));
 	
-	
 	char* letter = combineString(num," !AD \0");
 	char* result = combineString(letter,filename);
 	result = combineString(result, " \0");
@@ -163,6 +164,7 @@ int add(char* projName, char* filename) {
 	writeTo(manFD2,result);
 	write(manFD2,"\n",1);
 	printf("Successfully added %s to .Manifest of %s.\n",filename,projName);
+	close(fd);
 	return 1; //success
 }
 
@@ -216,18 +218,19 @@ int compareString(char* str1, char* str2) {
 
 char* compHash(char* fileContent) {
 	int DataLen = strlen(fileContent);
-	SHA_CTX shactx;
-	byte digest[SHA_DIGEST_LENGTH];
+	//SHA_CTX shactx;
+	byte digest[SHA256_DIGEST_LENGTH];
 	int i;
 
-	byte* testdata = (byte *)malloc(DataLen);
-	for (i=0; i<DataLen; i++) testdata[i] = 0;
+	//byte* testdata = (byte*)malloc(DataLen);
+	//for (i=0; i<DataLen; i++) testdata[i] = 0;
 
-	SHA1_Init(&shactx);
-	SHA1_Update(&shactx, testdata, DataLen);
-	SHA1_Final(digest, &shactx);
-	unsigned char* hash = malloc(SHA_DIGEST_LENGTH * 2);
-	for (i=0; i<SHA_DIGEST_LENGTH; i++)
+	//SHA1_Init(&shactx);
+	//SHA1_Update(&shactx, testdata, DataLen);
+	//SHA1_Final(digest, &shactx);
+	SHA256(fileContent,DataLen,digest);
+	unsigned char* hash = malloc(SHA256_DIGEST_LENGTH * 2);
+	for (i=0; i<SHA256_DIGEST_LENGTH; i++)
 		//printf("%02x",digest[i]);
 		sprintf((char*)(hash+(i*2)),"%02x", digest[i]);
 	return hash;
@@ -405,7 +408,7 @@ char* readManifest(int manFD) {
 	return numRet;
 }
 
-int remove(char* projectname, char* filename) {
+int removeFile(char* projName, char* filename) {
 	DIR *d;
 	struct dirent *dir;
 	if (!(d = opendir(projName))) {
@@ -424,10 +427,40 @@ int remove(char* projectname, char* filename) {
 	char* num = readManifest(manFD);
 	close(manFD);
 	
-	if (tableSearch(filename) != -1) {
-		printf("Warning: File already in .Manifest, commit before you add %s again.\n",filename);
+	int indexVal = tableSearch(filename);
+	if ( indexVal == -1) {
+		printf("Warning: File not present in .Manifest, add before you remove.\n",filename);
 		return 0; //warning
+	} else {
+		remove(filename);
+		int manFD2 = open(manFile,O_WRONLY | O_CREAT | O_TRUNC,00600);
+		num = combineString(num,"\n\0");
+		writeTo(manFD2,num);
+		int i;
+		for (i = 0; i < table->size; i++) {
+			//printf("hi\n");
+			hashNode* temp = table->table[i];
+			while (temp) {
+				if (compareString(temp->filepath,filename) == 0) {
+					temp = temp->next;
+				} else {
+					writeTo(manFD2,temp->version);
+					writeTo(manFD2," ");
+					writeTo(manFD2,temp->code);
+					writeTo(manFD2," ");
+					writeTo(manFD2,temp->filepath);
+					writeTo(manFD2," ");
+					writeTo(manFD2,temp->shacode);
+					writeTo(manFD2,"\n");
+					temp = temp->next;
+				}
+			}
+		}
+		
 	}
+	close(fd);
+	printf("Successfully removed %s from %s and updated .Manifest\n",filename,projName);
+	return 1;
 }
 
 char* substring(char* str, int start, int end) {

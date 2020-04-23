@@ -1,0 +1,1 @@
+Successfully added ./hellothere/test3.txt to .Manifest of hellothere.
