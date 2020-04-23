@@ -317,6 +317,16 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 			int cr = create(projname);
 			printf("%s\n",buff);
 		}
+	} else if (compareString("destroy", action) == 0) {
+		char* total = combineString(action," \0");
+		total = combineString(total,projname); 
+		write(sockfd,total,strlen(total));
+		read(sockfd,buff,sizeof(buff));
+		if (compareString(buff,"Destroy failed. Project does not exist on server\n\0") == 0) {
+			printf("Destroy failed. Project does not exit on server\n");
+		} else {
+			printf("Successfully destroyed project on server...\n");
+		}
 	}	
 	/*for (;;) { 
 	  bzero(buff, sizeof(buff)); 
