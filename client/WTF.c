@@ -442,6 +442,14 @@ int removeFile(char* projName, char* filename) {
 			hashNode* temp = table->table[i];
 			while (temp) {
 				if (compareString(temp->filepath,filename) == 0) {
+					writeTo(manFD2,temp->version);
+					writeTo(manFD2," ");
+					writeTo(manFD2,"!RM\0");
+					writeTo(manFD2," ");
+					writeTo(manFD2,temp->filepath);
+					writeTo(manFD2," ");
+					writeTo(manFD2,temp->shacode);
+					writeTo(manFD2,"\n");
 					temp = temp->next;
 				} else {
 					writeTo(manFD2,temp->version);
