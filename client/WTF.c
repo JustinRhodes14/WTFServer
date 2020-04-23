@@ -406,7 +406,28 @@ char* readManifest(int manFD) {
 }
 
 int remove(char* projectname, char* filename) {
+	DIR *d;
+	struct dirent *dir;
+	if (!(d = opendir(projName))) {
+		printf("%s is not a valid project name\n",projName);
+		return -1;
+	}
+
+
+	int fd = open(filename,O_RDONLY);
+	if (fd == -1) {
+		printf("%s is not a valid file name\n",filename);
+		return -1;
+	}
+	char* manFile = combineString(projName,"/.Manifest\0");
+	int manFD = open(manFile,O_RDONLY);
+	char* num = readManifest(manFD);
+	close(manFD);
 	
+	if (tableSearch(filename) != -1) {
+		printf("Warning: File already in .Manifest, commit before you add %s again.\n",filename);
+		return 0; //warning
+	}
 }
 
 char* substring(char* str, int start, int end) {
