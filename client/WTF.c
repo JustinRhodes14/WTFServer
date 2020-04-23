@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <netdb.h> 
 #include <stdio.h> 
 #include <stdlib.h> 
@@ -21,15 +22,37 @@ void configure(char*,char*);
 char* copyString(char*,char*);
 int create(char*);
 int extractInfo(char*);
+void extractMan(char*);
 void func(int,char*,char*,char*,int);
 char* readConf(int);
+char* readManifest(int);
+int remove(char*,char*);
 void stopSig(int);
 char* substring(char*,int,int);
+int tableComphash(char*);
+void tableInit(int);
+void tableInsert(char*,char*,char*,char*);
+int tableSearch(char*);
 void writeTo(int,char*);
 
 typedef unsigned char byte;
 
 int sockfd, connfd; 
+
+typedef struct _hashNode {
+	char* version;
+	char* code;
+	char* filepath;
+	char* shacode;
+	struct _hashNode* next;
+}hashNode;
+
+typedef struct _hashTable {
+	int size;
+	hashNode** table;
+}hashTable;
+
+hashTable* table;
 
 void stopSig(int signum) { 
 	printf("\nStopping connection to server\n");
@@ -47,7 +70,11 @@ int main(int argc, char** argv)
 		printf("Successfully created .configure file\n");
 		return 0;
 	} else if (compareString("add\0",argv[1]) == 0) {
+		tableInit(250);
 		add(argv[2],argv[3]);
+		return 0;
+	} else if (compareString("remove\0",argv[1]) == 0) {
+		//remove(argv[2],argv[3]);
 		return 0;
 	}
 	int conf = open("./.configure",O_RDONLY);
@@ -101,39 +128,42 @@ int add(char* projName, char* filename) {
 		return -1;
 	}
 
-	char* path = combineString(projName,"/.Manifest/.Version\0");
-	int vFD =  open(path,O_RDONLY);
-	char* letter = readConf(vFD);
-	int length = strlen(letter);
-	letter = substring(letter,0,(length-1));
-	char* vName = combineString(letter,".0\0");
-	vName = combineString("Version \0", vName);
-	vName = combineString("/.Manifest/\0",vName);
-	vName = combineString(projName,vName);
 
-	//char* path2 = combineString(projName,"/\0");
-	//path2 = combineString(path2,filename);
 	int fd = open(filename,O_RDONLY);
 	if (fd == -1) {
 		printf("%s is not a valid file name\n",filename);
 		return -1;
 	}
+	char* manFile = combineString(projName,"/.Manifest\0");
+	int manFD = open(manFile,O_RDONLY);
+	char* num = readManifest(manFD);
+	close(manFD);
+	
+	if (tableSearch(filename) != -1) {
+		printf("Warning: File already in .Manifest, commit before you add %s again.\n",filename);
+		return 0; //warning
+	}
 
+	int manFD2 = open(manFile,O_RDWR);
+	//memset(buffer,'\0',256);
+	//read(manFD2,buffer,2);
+	int t = lseek(manFD2,0,SEEK_END);
+	
 	char* hashedStuff = "";
 
 	char* toHash = readConf(fd);
 	hashedStuff = combineString(hashedStuff,compHash(toHash));
 	
 	
-	char* result = combineString("!AD \0",filename);
+	char* letter = combineString(num," !AD \0");
+	char* result = combineString(letter,filename);
 	result = combineString(result, " \0");
 	result = combineString(result,hashedStuff);
 	
-	int manFD = open(vName,O_RDWR);
-	int t = lseek(manFD,0,SEEK_END);
-	writeTo(manFD,result);
-	write(manFD,"\n",1);
+	writeTo(manFD2,result);
+	write(manFD2,"\n",1);
 	printf("Successfully added %s to .Manifest of %s.\n",filename,projName);
+	return 1; //success
 }
 
 char* combineString(char* str1, char* str2) {
@@ -231,13 +261,8 @@ int create(char* projectName) {
 		char* histFile = combineString(projectName,"/.History\0");
 		int histFD = open(histFile, O_WRONLY | O_CREAT | O_TRUNC, 00600);
 		char* manFile = combineString(projectName,"/.Manifest\0");
-		mkdir(manFile,0700);
-		char* vFile = combineString(manFile,"/.Version\0");
-		int vFD = open(vFile, O_WRONLY | O_CREAT | O_TRUNC, 00600);
-		writeTo(vFD,"1\0");
-		manFile = combineString(manFile, "/Version 1.0\0");
-		int manFD = open(manFile, O_WRONLY | O_CREAT | O_TRUNC,00600);
-		writeTo(manFD,"Version 1.0\n");
+		int manFD = open(manFile,O_WRONLY | O_CREAT | O_TRUNC, 00600);
+		writeTo(manFD,"1\n\0");
 		close(manFD);
 		return 1;
 	} else {
@@ -252,6 +277,25 @@ int extractInfo(char* word) {
 		counter++;
 	}
 	return counter;
+}
+
+void extractMan(char* manWord) {
+	char** manInfo = (char**)malloc(4 * sizeof(char*));
+	int i;
+	int count = 0;
+	int start = 0;
+	for (i = 0; i < strlen(manWord); i++) {
+		if (manWord[i] == ' ') {
+			manInfo[count] = substring(manWord,start,i);
+			start = i + 1;
+			count++;		
+		}
+		if (count == 3) {
+			manInfo[count] = substring(manWord,start,-1);
+		}
+	}
+	tableInsert(manInfo[0],manInfo[1],manInfo[2],manInfo[3]);
+	//printf("%s, %s, %s, %s\n",manInfo[0],manInfo[1],manInfo[2],manInfo[3]);
 }
 
 void func(int sockfd,char* action, char* projname,char* fname,int version) 
@@ -269,11 +313,6 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 		} else {
 			int cr = create(projname);
 			printf("%s\n",buff);
-			int split = extractInfo(buff);
-			char* version = substring(buff,split+1,-1);
-			char* manFile = combineString(projname,"/.Manifest/Version 1.0\0");
-			int fd = open(manFile,O_WRONLY | O_CREAT | O_TRUNC,00600);
-			writeTo(fd,version);
 		}
 	}	
 	/*for (;;) { 
@@ -312,6 +351,64 @@ char* readConf(int conFD) {
 	return confInfo;
 }
 
+char* readManifest(int manFD) {
+	int status = 1;
+	int bytesRead = 0;
+	char* holder;
+	char* numRet;
+	bool moreStuff = false;
+	bool first = true;
+	
+	while (status > 0) {
+		char buffer[101];
+		memset(buffer,'\0',101);
+		int readIn = 0;
+		do {
+			status = read(manFD,buffer,100 - readIn);
+			if (status == 0) {
+				break;
+			}
+			readIn+= status;
+		}while(readIn < 100);
+		int end = 0;
+		int start = 0;
+		while (end < 100) {
+			char* temp;
+			if (buffer[end] == '\n') {
+				temp = substring(buffer,start,end);
+				if (first == true) {
+					numRet = copyString(numRet,temp);
+					first = false;
+				} else if (moreStuff == true) {
+					holder = combineString(holder,temp);
+					moreStuff = false;
+					extractMan(holder);
+				} else {
+					extractMan(temp);
+				}
+				start = end + 1;
+			}
+			if (end == 99) {
+				if (moreStuff == true) {
+					holder = combineString(holder,buffer);
+				} else {
+					holder = substring(buffer,start, -1);	
+				}
+				moreStuff = true;
+			}
+			if (buffer[end] == '\0') {
+				break;	
+			}
+			end++;
+		}
+	}
+	return numRet;
+}
+
+int remove(char* projectname, char* filename) {
+	
+}
+
 char* substring(char* str, int start, int end) {
 	char* result;
 	if (end == -1) {
@@ -335,6 +432,65 @@ char* substring(char* str, int start, int end) {
 		}	
 	}
 	return result;
+}
+
+int tableComphash(char* filepath) {
+	int len = strlen(filepath);
+	int code = 0;
+	int i;
+	for (i = 0; i < len; i++) {
+		code += (filepath[0] - 0);
+	}
+	return (code % table->size);
+}
+
+void tableInit(int size) {
+	table = (hashTable*)malloc(sizeof(hashTable));
+	table->size = size;
+	table->table = (hashNode**)malloc(size * sizeof(hashNode*));
+	int i;
+	for (i = 0; i < size; i++) {
+		table->table[i] = NULL;
+	}
+}
+
+void tableInsert(char* version, char* code, char* filepath, char* shacode) {
+	int index = -1;
+	index = tableComphash(filepath);
+	if (index == -1) {
+		printf("Error in hashInsert\n");
+		exit(0);
+	}
+	hashNode* temp = table->table[index];
+	hashNode* toInsert = (hashNode*)malloc(sizeof(hashNode));
+	hashNode* temp2 = temp;
+	while (temp2) {
+		temp2 = temp2->next;
+	}
+	toInsert->version = version;
+	toInsert->code = code;
+	toInsert->filepath = filepath;
+	toInsert->shacode = shacode;
+	toInsert->next = temp;
+	table->table[index] = toInsert;
+}
+
+int tableSearch(char* filepath) {
+	int index = -1;
+	index = tableComphash(filepath);
+	if (index == -1) {
+		printf("Error in hashInsert\n");
+		exit(0);
+	}
+	hashNode* temp = table->table[index];
+	hashNode* temp2 = temp;
+	while (temp2) {
+		if (compareString(temp2->filepath,filepath) == 0) {
+			return index;
+		}
+		temp2 = temp2->next;
+	}
+	return -1;	
 }
 
 void writeTo(int fd, char* word) {
