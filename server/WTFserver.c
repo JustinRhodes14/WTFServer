@@ -244,7 +244,10 @@ void func(int sockfd)
 			rmdir(project);
 			resultMessage = combineString(resultMessage, "Successfully destroyed project.\n");
 			write(sockfd,resultMessage,strlen(resultMessage));
+			printf("Successfully destroyed %s\n", project);
 		}
+	} else if (compareString("checkout",action) == 0) {
+		
 	}
 	/*
 	char buff[80]; 

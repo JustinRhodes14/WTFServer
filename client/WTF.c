@@ -327,6 +327,11 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 		} else {
 			printf("Successfully destroyed project on server...\n");
 		}
+	} else if (compareString("checkout",action) == 0) {
+		char* total = combineString(action," \0");
+		total = combineString(total,projname);
+		write(sockfd,total,strlen(total));
+		//some read function here
 	}	
 	/*for (;;) { 
 	  bzero(buff, sizeof(buff)); 
