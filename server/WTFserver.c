@@ -17,11 +17,17 @@ int compareString(char*,char*);
 char* copyString(char*,char*);
 int create(char*);
 void destroy(char*);
+void extractMan(char*);
 int extractInfo(char*); 
-void func(int); 
+void func(int);
+char* readManifest(int);
 char* readSock(int); 
 void stopSig(int);
 char* substring(char*,int,int);
+int tableComphash(char*);
+void tableInit(int);
+void tableInsert(char*,char*,char*,char*);
+int tableSearch(char*);
 void writeTo(int,char*);
 
 
@@ -201,6 +207,25 @@ void destroy(char* path) {
 	closedir(d);
 }
 
+void extractMan(char* manWord) {
+	char** manInfo = (char**)malloc(4 * sizeof(char*));
+	int i;
+	int count = 0;
+	int start = 0;
+	for (i = 0; i < strlen(manWord); i++) {
+		if (manWord[i] == ' ') {
+			manInfo[count] = substring(manWord,start,i);
+			start = i + 1;
+			count++;		
+		}
+		if (count == 3) {
+			manInfo[count] = substring(manWord,start,-1);
+		}
+	}
+	tableInsert(manInfo[0],manInfo[1],manInfo[2],manInfo[3]);
+	//printf("%s, %s, %s, %s\n",manInfo[0],manInfo[1],manInfo[2],manInfo[3]);
+}
+
 int extractInfo(char* word) {
 	int counter = 0;
 	while (word[counter] != ' ') {
@@ -279,6 +304,60 @@ void func(int sockfd)
 	}*/
 }
 
+char* readManifest(int manFD) {
+	int status = 1;
+	int bytesRead = 0;
+	char* holder;
+	char* numRet;
+	bool moreStuff = false;
+	bool first = true;
+	
+	while (status > 0) {
+		char buffer[101];
+		memset(buffer,'\0',101);
+		int readIn = 0;
+		do {
+			status = read(manFD,buffer,100 - readIn);
+			if (status == 0) {
+				break;
+			}
+			readIn+= status;
+		}while(readIn < 100);
+		int end = 0;
+		int start = 0;
+		while (end < 100) {
+			char* temp;
+			if (buffer[end] == '\n') {
+				temp = substring(buffer,start,end);
+				if (first == true) {
+					numRet = copyString(numRet,temp);
+					first = false;
+				} else if (moreStuff == true) {
+					holder = combineString(holder,temp);
+					moreStuff = false;
+					extractMan(holder);
+				} else {
+					extractMan(temp);
+				}
+				start = end + 1;
+			}
+			if (end == 99) {
+				if (moreStuff == true) {
+					holder = combineString(holder,buffer);
+				} else {
+					holder = substring(buffer,start, -1);	
+				}
+				moreStuff = true;
+			}
+			if (buffer[end] == '\0') {
+				break;	
+			}
+			end++;
+		}
+	}
+	return numRet;
+}
+
 char* readSock(int sockFD) {
 	int status = 1;
 	int bytesRead = 0;
@@ -322,6 +401,65 @@ char* substring(char* str, int start, int end) {
 		}	
 	}
 	return result;
+}
+
+int tableComphash(char* filepath) {
+	int len = strlen(filepath);
+	int code = 0;
+	int i;
+	for (i = 0; i < len; i++) {
+		code += (filepath[0] - 0);
+	}
+	return (code % table->size);
+}
+
+void tableInit(int size) {
+	table = (hashTable*)malloc(sizeof(hashTable));
+	table->size = size;
+	table->table = (hashNode**)malloc(size * sizeof(hashNode*));
+	int i;
+	for (i = 0; i < size; i++) {
+		table->table[i] = NULL;
+	}
+}
+
+void tableInsert(char* version, char* code, char* filepath, char* shacode) {
+	int index = -1;
+	index = tableComphash(filepath);
+	if (index == -1) {
+		printf("Error in hashInsert\n");
+		exit(0);
+	}
+	hashNode* temp = table->table[index];
+	hashNode* toInsert = (hashNode*)malloc(sizeof(hashNode));
+	hashNode* temp2 = temp;
+	while (temp2) {
+		temp2 = temp2->next;
+	}
+	toInsert->version = version;
+	toInsert->code = code;
+	toInsert->filepath = filepath;
+	toInsert->shacode = shacode;
+	toInsert->next = temp;
+	table->table[index] = toInsert;
+}
+
+int tableSearch(char* filepath) {
+	int index = -1;
+	index = tableComphash(filepath);
+	if (index == -1) {
+		printf("Error in hashInsert\n");
+		exit(0);
+	}
+	hashNode* temp = table->table[index];
+	hashNode* temp2 = temp;
+	while (temp2) {
+		if (compareString(temp2->filepath,filepath) == 0) {
+			return index;
+		}
+		temp2 = temp2->next;
+	}
+	return -1;	
 }
 
 void writeTo(int fd, char* word) {
