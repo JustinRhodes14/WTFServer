@@ -27,6 +27,7 @@ char* readSock(int);
 void stopSig(int);
 char* substring(char*,int,int);
 int tableComphash(char*);
+void tableFree(int);
 void tableInit(int);
 void tableInsert(char*,char*,char*,char*);
 int tableSearch(char*);
@@ -46,6 +47,7 @@ typedef struct _hashTable {
 }hashTable;
 
 hashTable* table; 
+int hashSize = 0;
 
 int sockfd, connfd, len; 
 
@@ -118,6 +120,33 @@ int main(int argc, char** argv)
 	}
 	// After chatting close the socket 
 	close(sockfd);
+}
+
+char* checkout() {
+	char* toSend = "";
+	toSend = combineString(toSend,"sendproject:\0");
+	char num[256];
+	memset(num,'\0',256);
+	sprintf(num,"%d:",hashSize);
+	toSend = combineString(toSend,num);
+	int i;
+	for (i = 0; i < table->size; i++) {
+		hashNode* temp = table->table[i];
+		while (temp) {
+			int length = strlen(temp->filepath);
+			int fd = open(temp->filepath,O_RDONLY);
+			char* filecontent = readSock(fd);
+			char num2[256];
+			memset(num2,'\0',256);
+			sprintf(num2,"%d:%d:",length,strlen(filecontent));
+			toSend = combineString(toSend,num2);
+			toSend = combineString(toSend,temp->filepath);
+			toSend = combineString(toSend,filecontent);
+			temp = temp->next;
+		}
+	}
+	//printf("Tosend: %s\n",toSend);
+	return toSend;
 }
  
 char* combineString(char* str1, char* str2) {
@@ -306,7 +335,19 @@ void func(int sockfd)
 			printf("Successfully destroyed %s\n", project);
 		}
 	} else if (compareString("checkout",action) == 0) {
-		
+		tableInit(100);
+		char* manFile = combineString(project,"/.Manifest\0");
+		int manFD = open(manFile,O_RDONLY);
+		readManifest(manFD);
+		char* message = checkout();
+		bzero(buff,sizeof(buff));
+		sprintf(buff,"%d",strlen(message));
+		printf("%s\n",buff);
+		write(sockfd,buff,sizeof(buff));
+		bzero(buff,sizeof(buff));
+		read(sockfd,buff,sizeof(buff));
+		write(sockfd,message,strlen(message));
+		tableFree(100);
 	} else if (compareString("currentversion",action) == 0) {
 		DIR* d;
 		struct dirent* dir;
@@ -335,6 +376,7 @@ void func(int sockfd)
 			read(sockfd,buffer2,sizeof(buffer2));
 			write(sockfd,toWrite,strlen(toWrite));
 			printf("Successfully returned currentversion to client\n");
+			tableFree(100);
 		}
 	}
 	/*
@@ -474,6 +516,20 @@ int tableComphash(char* filepath) {
 	return (code % table->size);
 }
 
+void tableFree(int size) {
+	int i;
+	for (i = 0; i < size; i++) {
+		hashNode* temp = table->table[i];
+		while (temp != NULL) {
+			hashNode* temp2 = temp;
+			temp = temp2->next;
+			free(temp2);
+		}
+	}
+	free(table);
+	hashSize = 0;	
+}
+
 void tableInit(int size) {
 	table = (hashTable*)malloc(sizeof(hashTable));
 	table->size = size;
@@ -503,6 +559,7 @@ void tableInsert(char* version, char* code, char* filepath, char* shacode) {
 	toInsert->shacode = shacode;
 	toInsert->next = temp;
 	table->table[index] = toInsert;
+	hashSize++;
 }
 
 int tableSearch(char* filepath) {

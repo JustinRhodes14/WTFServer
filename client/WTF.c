@@ -352,6 +352,15 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 		char* total = combineString(action," \0");
 		total = combineString(total,projname);
 		write(sockfd,total,strlen(total));
+		bzero(buff,sizeof(buff));
+		read(sockfd,buff,sizeof(buff));
+		write(sockfd,"I got your message\n",19);
+		int length = atoi(buff);
+		printf("Len: %d\n",length);
+		char buff2[length + 1];
+		bzero(buff2,sizeof(buff2));
+		read(sockfd,buff2,length);
+		printf("Buff2: %s\n",buff2);
 		//some read function here
 	}	
 	/*for (;;) { 
