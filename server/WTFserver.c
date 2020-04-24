@@ -213,7 +213,6 @@ char* currver(int manFD,char* vernum) {
 		}
 	}
 	//printf("Result: %s",result);
-	close(manFD);
 	return result;
 }
 
@@ -320,16 +319,17 @@ void func(int sockfd)
 			char* manFile = combineString(project,"/.Manifest\0");
 			int manFD = open(manFile,O_RDONLY);
 			char* num = readManifest(manFD);
-			close(manFD);
-			int manFD2 = open(manFile,O_RDONLY);
-			char* toWrite = currver(manFD2,num);
-			//printf("%s",toWrite);
-			char length[256];
-			sprintf(length,"%d",strlen(toWrite));
-			char* prepend = combineString(length,"\n\0");
-			prepend = combineString(prepend,toWrite);
-			printf("%s",prepend);
-			write(sockfd,prepend,strlen(prepend));
+			lseek(manFD,0,SEEK_SET);
+			//close(manFD);
+			char* toWrite = currver(manFD,num);
+			//close(manFD2);
+			//char length[256];
+			//memset(length,'\0',256);
+			//sprintf(length,"%d",strlen(toWrite));
+			//char* prepend = combineString(length,"\n\0");
+			//prepend = combineString(prepend,toWrite);
+			printf("%s",toWrite);
+			write(sockfd,toWrite,strlen(toWrite));
 		}
 	}
 	/*
