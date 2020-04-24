@@ -248,6 +248,8 @@ void func(int sockfd)
 		}
 	} else if (compareString("checkout",action) == 0) {
 		
+	} else if (compareString("currentversion",action) == 0) {
+			
 	}
 	/*
 	char buff[80]; 
