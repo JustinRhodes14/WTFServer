@@ -333,12 +333,19 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 		write(sockfd,total,strlen(total));
 		char* message = "";
 		int bytesRead = 0;
-		do {
-			bzero(buff,sizeof(buff));
-			bytesRead = read(sockfd,buff,(sizeof(buff)-1));
-			message = combineString(message,buff);
-		}while(bytesRead > 0);
-		printf("Message: %s\n",message);
+		bzero(buff,sizeof(buff));
+		bytesRead = read(sockfd,buff,(sizeof(buff)));
+		message = combineString(message,buff);
+		message = substring(message,0,strlen(message) - 1);
+		printf("%s\n",message);
+		int length = atoi(message);
+		printf("%d\n",length);
+		char buffer2[length];
+		bzero(buffer2,sizeof(buffer2));
+		bytesRead = read(sockfd,buffer2,sizeof(buffer2));
+		char* m2 = "";
+		m2 = combineString(m2,buffer2);
+		//printf("%s\n",buffer);
 	} else if (compareString("checkout",action) == 0) {
 		char* total = combineString(action," \0");
 		total = combineString(total,projname);

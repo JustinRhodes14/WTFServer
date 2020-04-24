@@ -322,13 +322,14 @@ void func(int sockfd)
 			lseek(manFD,0,SEEK_SET);
 			//close(manFD);
 			char* toWrite = currver(manFD,num);
-			//close(manFD2);
-			//char length[256];
+			close(manFD);
+			char length[256];
 			//memset(length,'\0',256);
-			//sprintf(length,"%d",strlen(toWrite));
+			sprintf(length,"%d",strlen(toWrite));
+			printf("toWrite: %s, %s\n",toWrite,length);
 			//char* prepend = combineString(length,"\n\0");
 			//prepend = combineString(prepend,toWrite);
-			printf("%s",toWrite);
+			write(sockfd,length,strlen(length));
 			write(sockfd,toWrite,strlen(toWrite));
 		}
 	}
