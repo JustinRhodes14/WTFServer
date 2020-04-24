@@ -16,6 +16,7 @@
 #include <openssl/sha.h>
 #define SA struct sockaddr
 int addFile(char*,char*); 
+char* checkout();
 char* combineString(char*,char*);
 int compareString(char*,char*);
 char* compHash(char*);
@@ -166,6 +167,33 @@ int addFile(char* projName, char* filename) {
 	printf("Successfully added %s to .Manifest of %s.\n",filename,projName);
 	close(fd);
 	return 1; //success
+}
+
+char* checkout() {
+	char* toSend = "";
+	toSend = combineString(toSend,"sendproject:\0");
+	char num[256];
+	memset(num,'\0',256);
+	sprintf(num,"%d:",hashSize);
+	toSend = combineString(toSend,num);
+	int i;
+	for (i = 0; i < table->size; i++) {
+		hashNode* temp = table->table[i];
+		while (temp) {
+			int length = strlen(temp->filepath);
+			int fd = open(temp->filepath,O_RDONLY);
+			char* filecontent = readSock(fd);
+			char num2[256];
+			memset(num2,'\0',256);
+			sprintf(num2,"%d:%d:",length,strlen(filecontent));
+			toSend = combineString(toSend,num2);
+			toSend = combineString(toSend,temp->filepath);
+			toSend = combineString(toSend,filecontent);
+			temp = temp->next;
+		}
+	}
+	//printf("Tosend: %s\n",toSend);
+	return toSend;
 }
 
 char* combineString(char* str1, char* str2) {
