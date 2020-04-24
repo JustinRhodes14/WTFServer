@@ -331,6 +331,9 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 		char* total = combineString(action," \0");
 		total = combineString(total,projname);
 		write(sockfd,total,strlen(total));
+		char buff2[256];
+		memset(buff2,'\0',256);
+		
 	} else if (compareString("checkout",action) == 0) {
 		char* total = combineString(action," \0");
 		total = combineString(total,projname);

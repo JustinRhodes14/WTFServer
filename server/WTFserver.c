@@ -11,6 +11,7 @@
 #include <signal.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <stdbool.h>
 #define SA struct sockaddr 
 char* combineString(char*,char*);
 int compareString(char*,char*);
@@ -30,9 +31,24 @@ void tableInsert(char*,char*,char*,char*);
 int tableSearch(char*);
 void writeTo(int,char*);
 
+typedef struct _hashNode {
+	char* version;
+	char* code;
+	char* filepath;
+	char* shacode;
+	struct _hashNode* next;
+}hashNode;
+
+typedef struct _hashTable {
+	int size;
+	hashNode** table;
+}hashTable;
+
+hashTable* table; 
 
 int sockfd, connfd, len; 
 
+			
 void stopSig(int signum) {
 	printf("\nStopping connection to server and client\n");
 	(void) signal(SIGINT,SIG_DFL);
@@ -182,6 +198,25 @@ int create(char* projectName) {
 	}
 }
 
+char* currver(int manFD,char* vernum) {
+	char* result = "";
+	result = combineString(result,vernum);
+	int i;	
+	for (i = 0; i < table->size; i++) {
+		hashNode* temp = table->table[i];
+		while (temp) {
+			result = combineString(result,"\n\0");
+			result = combineString(result,temp->version);
+			result = combineString(result," \0");
+			result = combineString(result,temp->filepath);
+			temp = temp->next;
+		}
+	}
+	//printf("Result: %s",result);
+	close(manFD);
+	return result;
+}
+
 void destroy(char* path) {
 	DIR* d;
 	struct dirent* dir;
@@ -274,7 +309,28 @@ void func(int sockfd)
 	} else if (compareString("checkout",action) == 0) {
 		
 	} else if (compareString("currentversion",action) == 0) {
-			
+		DIR* d;
+		struct dirent* dir;
+		if(!(d = opendir(project))) {
+			resultMessage = combineString(resultMessage, "Project does not exist on server\n");
+			write(sockfd,resultMessage,strlen(resultMessage));
+			closedir(d);
+		} else {
+			tableInit(100);
+			char* manFile = combineString(project,"/.Manifest\0");
+			int manFD = open(manFile,O_RDONLY);
+			char* num = readManifest(manFD);
+			close(manFD);
+			int manFD2 = open(manFile,O_RDONLY);
+			char* toWrite = currver(manFD2,num);
+			//printf("%s",toWrite);
+			char length[256];
+			sprintf(length,"%d",strlen(toWrite));
+			char* prepend = combineString(length,"\n\0");
+			prepend = combineString(prepend,toWrite);
+			printf("%s",prepend);
+			write(sockfd,prepend,strlen(prepend));
+		}
 	}
 	/*
 	char buff[80]; 
