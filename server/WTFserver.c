@@ -17,6 +17,7 @@ char* combineString(char*,char*);
 int compareString(char*,char*);
 char* copyString(char*,char*);
 int create(char*);
+char* currverr(int);
 void destroy(char*);
 void extractMan(char*);
 int extractInfo(char*); 
@@ -198,17 +199,16 @@ int create(char* projectName) {
 	}
 }
 
-char* currver(int manFD,char* vernum) {
+char* currver(int manFD) {
 	char* result = "";
-	result = combineString(result,vernum);
 	int i;	
 	for (i = 0; i < table->size; i++) {
 		hashNode* temp = table->table[i];
 		while (temp) {
-			result = combineString(result,"\n\0");
 			result = combineString(result,temp->version);
 			result = combineString(result," \0");
 			result = combineString(result,temp->filepath);
+			result = combineString(result,"\n\0");
 			temp = temp->next;
 		}
 	}
@@ -312,6 +312,7 @@ void func(int sockfd)
 		struct dirent* dir;
 		if(!(d = opendir(project))) {
 			resultMessage = combineString(resultMessage, "Project does not exist on server\n");
+			printf("Project does not exist on server, sending error message...\n");
 			write(sockfd,resultMessage,strlen(resultMessage));
 			closedir(d);
 		} else {
@@ -321,7 +322,7 @@ void func(int sockfd)
 			char* num = readManifest(manFD);
 			lseek(manFD,0,SEEK_SET);
 			//close(manFD);
-			char* toWrite = currver(manFD,num);
+			char* toWrite = currver(manFD);
 			close(manFD);
 			char length[256];
 			memset(length,'\0',256);

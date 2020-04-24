@@ -315,7 +315,7 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 			printf("Project already exists on server, need to clone the project or pick a new name\n");
 		} else {
 			int cr = create(projname);
-			printf("%s\n",buff);
+			printf("%s",buff);
 		}
 	} else if (compareString("destroy", action) == 0) {
 		char* total = combineString(action," \0");
@@ -336,6 +336,10 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 		bzero(buff,sizeof(buff));
 		bytesRead = read(sockfd,buff,(sizeof(buff)));
 		message = combineString(message,buff);
+		if (compareString(message,"Project does not exist on server\n") == 0) {
+			printf("%s",message);
+			return;
+		}
 		int length = atoi(message);
 		write(sockfd,"I got your message\n",19);
 		char buffer2[length+1];
@@ -343,7 +347,7 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 		bytesRead = read(sockfd,buffer2,length);
 		char* m2 = "";
 		m2 = combineString(m2,buffer2);
-		printf("%s\n",m2);
+		printf("%s",m2);
 	} else if (compareString("checkout",action) == 0) {
 		char* total = combineString(action," \0");
 		total = combineString(total,projname);
