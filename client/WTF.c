@@ -336,16 +336,14 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 		bzero(buff,sizeof(buff));
 		bytesRead = read(sockfd,buff,(sizeof(buff)));
 		message = combineString(message,buff);
-		message = substring(message,0,strlen(message) - 1);
-		printf("%s\n",message);
 		int length = atoi(message);
-		printf("%d\n",length);
-		char buffer2[length];
+		write(sockfd,"I got your message\n",19);
+		char buffer2[length+1];
 		bzero(buffer2,sizeof(buffer2));
-		bytesRead = read(sockfd,buffer2,sizeof(buffer2));
+		bytesRead = read(sockfd,buffer2,length);
 		char* m2 = "";
 		m2 = combineString(m2,buffer2);
-		//printf("%s\n",buffer);
+		printf("%s\n",m2);
 	} else if (compareString("checkout",action) == 0) {
 		char* total = combineString(action," \0");
 		total = combineString(total,projname);

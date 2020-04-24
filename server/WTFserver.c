@@ -324,13 +324,16 @@ void func(int sockfd)
 			char* toWrite = currver(manFD,num);
 			close(manFD);
 			char length[256];
-			//memset(length,'\0',256);
+			memset(length,'\0',256);
 			sprintf(length,"%d",strlen(toWrite));
-			printf("toWrite: %s, %s\n",toWrite,length);
 			//char* prepend = combineString(length,"\n\0");
 			//prepend = combineString(prepend,toWrite);
 			write(sockfd,length,strlen(length));
+			char buffer2[256];
+			bzero(buffer2,sizeof(buffer2));
+			read(sockfd,buffer2,sizeof(buffer2));
 			write(sockfd,toWrite,strlen(toWrite));
+			printf("Successfully returned currentversion to client\n");
 		}
 	}
 	/*
