@@ -17,11 +17,13 @@ char* combineString(char*,char*);
 int compareString(char*,char*);
 char* copyString(char*,char*);
 int create(char*);
+char* checkout();
 char* currverr(int);
 void destroy(char*);
 void extractMan(char*);
 int extractInfo(char*); 
 void func(int);
+void listDirectories(char*);
 char* readManifest(int);
 char* readSock(int); 
 void stopSig(int);
@@ -32,6 +34,8 @@ void tableInit(int);
 void tableInsert(char*,char*,char*,char*);
 int tableSearch(char*);
 void writeTo(int,char*);
+
+char* directories = "";
 
 typedef struct _hashNode {
 	char* version;
@@ -51,7 +55,7 @@ int hashSize = 0;
 
 int sockfd, connfd, len; 
 
-			
+
 void stopSig(int signum) {
 	printf("\nStopping connection to server and client\n");
 	(void) signal(SIGINT,SIG_DFL);
@@ -123,8 +127,8 @@ int main(int argc, char** argv)
 }
 
 char* checkout() {
-	char* toSend = "";
-	toSend = combineString(toSend,"sendproject:\0");
+	
+	char* toSend = "sendproject:\0";
 	char num[256];
 	memset(num,'\0',256);
 	sprintf(num,"%d:",hashSize);
@@ -148,7 +152,7 @@ char* checkout() {
 	//printf("Tosend: %s\n",toSend);
 	return toSend;
 }
- 
+
 char* combineString(char* str1, char* str2) {
 	int len1 = strlen(str1);
 	int len2 = strlen(str2);
@@ -209,9 +213,9 @@ char* copyString(char* to, char* from) {
 }
 
 int create(char* projectName) {
-	
+
 	struct stat st = {0};
-	
+
 	if (stat(projectName, &st) == -1) {
 		mkdir(projectName,0700);
 		char* histFile = combineString(projectName,"/.History\0");
@@ -301,19 +305,22 @@ void func(int sockfd)
 { 
 	char buff[256];
 	bzero(buff,256);
-	
+
 	read(sockfd,buff,sizeof(buff));
-	
+	if (compareString(buff,"Error\0") == 0) {
+		printf("Error on client side, going back to accept...\n");
+		return;	
+	}
 	int split = extractInfo(buff);
-	
+
 	char* resultMessage = "";
 	char* action = substring(buff,0,split);
 	char* project = substring(buff,split+1,-1);
 	if (compareString("create\0",action) == 0) {
 		int result = create(project);
 		if (result == 1) {
-		resultMessage = combineString(resultMessage, "Successfully initalized project on server and client\n");
-		write(sockfd,resultMessage,strlen(resultMessage));
+			resultMessage = combineString(resultMessage, "Successfully initalized project on server and client\n");
+			write(sockfd,resultMessage,strlen(resultMessage));
 		} else {
 			resultMessage = combineString(resultMessage,"Project already exists on server\n\0");
 			write(sockfd,resultMessage,strlen(resultMessage));
@@ -335,19 +342,48 @@ void func(int sockfd)
 			printf("Successfully destroyed %s\n", project);
 		}
 	} else if (compareString("checkout",action) == 0) {
-		tableInit(100);
-		char* manFile = combineString(project,"/.Manifest\0");
-		int manFD = open(manFile,O_RDONLY);
-		readManifest(manFD);
-		char* message = checkout();
-		bzero(buff,sizeof(buff));
-		sprintf(buff,"%d",strlen(message));
-		printf("%s\n",buff);
-		write(sockfd,buff,sizeof(buff));
-		bzero(buff,sizeof(buff));
-		read(sockfd,buff,sizeof(buff));
-		write(sockfd,message,strlen(message));
-		tableFree(100);
+		DIR* d;
+		struct dirent* dir;
+		if(!(d = opendir(project))) {
+			resultMessage = combineString(resultMessage, "Project does not exist on server\n");
+			printf("Project does not exist on server, sending error message...\n");
+			write(sockfd,resultMessage,strlen(resultMessage));
+			closedir(d);
+		} else {
+			listDirectories(project);
+
+			bzero(buff,sizeof(buff));
+			sprintf(buff,"%d",strlen(directories));
+			write(sockfd,buff,sizeof(buff));
+			bzero(buff,sizeof(buff));
+			read(sockfd,buff,sizeof(buff));
+			write(sockfd,directories,strlen(directories));
+			
+			tableInit(100);
+			char* manFile = combineString(project,"/.Manifest\0");
+			int manFD = open(manFile,O_RDONLY);
+			char* manText = readSock(manFD);
+			bzero(buff,sizeof(buff));
+			sprintf(buff,"%d",strlen(manText));
+			write(sockfd,buff,sizeof(buff));
+			bzero(buff,sizeof(buff));
+			read(sockfd,buff,sizeof(buff));
+			write(sockfd,manText,strlen(manText));
+
+
+			lseek(manFD,0,SEEK_SET);
+			readManifest(manFD);
+			close(manFD);
+			char* message = checkout();
+			bzero(buff,sizeof(buff));
+			sprintf(buff,"%d",strlen(message));
+			write(sockfd,buff,sizeof(buff));
+			bzero(buff,sizeof(buff));
+			read(sockfd,buff,sizeof(buff));
+			write(sockfd,message,strlen(message));
+			tableFree(100);
+			printf("Successfully cloned project into client.\n");
+		}
 	} else if (compareString("currentversion",action) == 0) {
 		DIR* d;
 		struct dirent* dir;
@@ -379,32 +415,27 @@ void func(int sockfd)
 			tableFree(100);
 		}
 	}
-	/*
-	char buff[80]; 
-	int n; 
-	// infinite loop for chat 
-	for (;;) { 
-		bzero(buff, 80); 
+}
 
-		// read the message from client and copy it in buffer 
-		read(sockfd, buff, sizeof(buff)); 
-		// print buffer which contains the client contents 
-		printf("From client: %s\t To client : ", buff); 
-		bzero(buff, 80); 
-		n = 0; 
-		// copy server message in the buffer 
-		while ((buff[n++] = getchar()) != '\n') 
-			; 
-
-		// and send that buffer to client 
-		write(sockfd, buff, sizeof(buff)); 
-
-		// if msg contains "Exit" then server exit and chat ended. 
-		if (strncmp("exit", buff, 4) == 0) { 
-			printf("Server Exit...\n"); 
-			break; 
-		} 
-	}*/
+void listDirectories(char* path) {
+	DIR *d;
+	struct dirent *dir;
+	if (!(d = opendir(path))) {
+		return;
+	}
+	while ((dir = readdir(d)) != NULL) {
+		if (dir->d_type == DT_DIR) {
+			if (compareString(dir->d_name,".") == 0 || compareString(dir->d_name,"..") == 0) {
+				continue;	
+			}
+			char* temp = combineString(path,"/");
+			temp = combineString(temp,dir->d_name);
+			directories = combineString(directories,temp);
+			directories = combineString(directories,"\n\0");
+			listDirectories(temp);
+		}	
+	}
+	closedir(d);
 }
 
 char* readManifest(int manFD) {
@@ -414,7 +445,7 @@ char* readManifest(int manFD) {
 	char* numRet;
 	bool moreStuff = false;
 	bool first = true;
-	
+
 	while (status > 0) {
 		char buffer[101];
 		memset(buffer,'\0',101);

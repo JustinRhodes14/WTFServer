@@ -16,7 +16,7 @@
 #include <openssl/sha.h>
 #define SA struct sockaddr
 int addFile(char*,char*); 
-char* checkout();
+void checkout(char*,char*,char*);
 char* combineString(char*,char*);
 int compareString(char*,char*);
 char* compHash(char*);
@@ -26,6 +26,7 @@ int create(char*);
 int extractInfo(char*);
 void extractMan(char*);
 void func(int,char*,char*,char*,int);
+void makeDirectories(char*);
 char* readConf(int);
 char* readManifest(int);
 int removeFile(char*,char*);
@@ -140,10 +141,41 @@ int addFile(char* projName, char* filename) {
 	char* manFile = combineString(projName,"/.Manifest\0");
 	int manFD = open(manFile,O_RDONLY);
 	char* num = readManifest(manFD);
-	close(manFD);
-	
+	close(manFD);	
 	if (tableSearch(filename) != -1) {
-		printf("Warning: File already in .Manifest, commit before you add %s again.\n",filename);
+		int manFD2 = open(manFile,O_WRONLY | O_CREAT | O_TRUNC,00600);
+		num = combineString(num,"\n\0");
+		writeTo(manFD2,num);
+		int i;
+		for (i = 0; i < table->size; i++) {
+			//printf("hi\n");
+			hashNode* temp = table->table[i];
+			while (temp) {
+				if (compareString(temp->filepath,filename) == 0) {
+					writeTo(manFD2,temp->version);
+					writeTo(manFD2," ");
+					writeTo(manFD2,"!MD\0");
+					writeTo(manFD2," ");
+					writeTo(manFD2,temp->filepath);
+					writeTo(manFD2," ");
+					writeTo(manFD2,temp->shacode);
+					writeTo(manFD2,"\n");
+					temp = temp->next;
+				} else {
+					writeTo(manFD2,temp->version);
+					writeTo(manFD2," ");
+					writeTo(manFD2,temp->code);
+					writeTo(manFD2," ");
+					writeTo(manFD2,temp->filepath);
+					writeTo(manFD2," ");
+					writeTo(manFD2,temp->shacode);
+					writeTo(manFD2,"\n");
+					temp = temp->next;
+				}
+			}
+		}
+		close(manFD2);
+		printf("Modified .Manifest entry for %s\n",filename);
 		return 0; //warning
 	}
 
@@ -168,32 +200,49 @@ int addFile(char* projName, char* filename) {
 	close(fd);
 	return 1; //success
 }
-
-char* checkout() {
-	char* toSend = "";
-	toSend = combineString(toSend,"sendproject:\0");
-	char num[256];
-	memset(num,'\0',256);
-	sprintf(num,"%d:",hashSize);
-	toSend = combineString(toSend,num);
-	int i;
-	for (i = 0; i < table->size; i++) {
-		hashNode* temp = table->table[i];
-		while (temp) {
-			int length = strlen(temp->filepath);
-			int fd = open(temp->filepath,O_RDONLY);
-			char* filecontent = readSock(fd);
-			char num2[256];
-			memset(num2,'\0',256);
-			sprintf(num2,"%d:%d:",length,strlen(filecontent));
-			toSend = combineString(toSend,num2);
-			toSend = combineString(toSend,temp->filepath);
-			toSend = combineString(toSend,filecontent);
-			temp = temp->next;
-		}
+ 
+void checkout(char* projname,char* message,char* manText) {
+	projname = combineString(projname,"/.Manifest\0");
+	int mFD = open(projname, O_WRONLY | O_CREAT | O_TRUNC, 00600);
+	writeTo(mFD,manText);
+	close(mFD);
+	message = substring(message,12,-1);
+	//printf("%s\n",message);
+	int length = strlen(message);
+	int i = 0;
+	while (message[i] != ':') {
+		i++;
 	}
-	//printf("Tosend: %s\n",toSend);
-	return toSend;
+	int num = atoi(substring(message,0,i));
+	int start = i+1;
+	int end = i+1;
+	//printf("%d\n",num);
+	int k;
+	for (k = 0; k < num; k++) {
+		int nameLength = 0;
+		int contentLength = 0;
+		while (message[end] != ':') {
+			end++;
+		}
+		nameLength = atoi(substring(message,start,end));
+		start = end+1;
+		end+= 1;
+		while (message[end] != ':') {
+			end++;
+		}
+		contentLength = atoi(substring(message,start,end));
+		start = end + 1;
+		end = start + nameLength;
+		char* fileName = substring(message,start,end);
+		start = end;
+		end = start + contentLength;
+		char* fileContent = substring(message,start,end);
+		//printf("%s and %s\n",fileName,fileContent);
+		int fd = open(fileName, O_WRONLY | O_CREAT | O_TRUNC, 00600);
+		writeTo(fd,fileContent);
+		close(fd);
+		start = end;
+	}
 }
 
 char* combineString(char* str1, char* str2) {
@@ -377,36 +426,69 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 		m2 = combineString(m2,buffer2);
 		printf("%s",m2);
 	} else if (compareString("checkout",action) == 0) {
+		DIR* d;
+		struct dirent* dir;
+		if ((d = opendir(projname))) {
+			write(sockfd,"Error",5);
+			printf("Project already exists on client, cannot clone\n");
+			closedir(d);
+			return;
+		}
 		char* total = combineString(action," \0");
 		total = combineString(total,projname);
 		write(sockfd,total,strlen(total));
 		bzero(buff,sizeof(buff));
 		read(sockfd,buff,sizeof(buff));
-		write(sockfd,"I got your message\n",19);
+		if(compareString(buff,"Project does not exist on server\n") == 0) {
+			printf("%s\n",buff);
+			return;
+		}
+		mkdir(projname,0700);
+		//directories
 		int length = atoi(buff);
-		printf("Len: %d\n",length);
+		write(sockfd,"I got your message\n",19);
+		char buff4[length + 1];
+		bzero(buff4,sizeof(buff4));
+		read(sockfd,buff4,sizeof(buff4));
+		//printf("%s\n",buff4);
+		makeDirectories(buff4);
+		
+		//manifest
+		bzero(buff,sizeof(buff));
+		read(sockfd,buff,sizeof(buff));
+		length = atoi(buff);
+		write(sockfd,"I got your message\n",19);
+		char buff3[length + 1];
+		bzero(buff3,sizeof(buff3));
+		read(sockfd,buff3,sizeof(buff3));
+	 	//printf("%s\n",buff3);
+		
+		//file paths
+		bzero(buff,sizeof(buff));
+		read(sockfd,buff,sizeof(buff));
+		length = atoi(buff);
+		write(sockfd,"I got your message\n",19);
+		//printf("Len: %d\n",length);
 		char buff2[length + 1];
 		bzero(buff2,sizeof(buff2));
 		read(sockfd,buff2,length);
-		printf("Buff2: %s\n",buff2);
-		//some read function here
+		checkout(projname,buff2,buff3);
+		printf("Successfully cloned %s.\n",projname);
 	}	
-	/*for (;;) { 
-	  bzero(buff, sizeof(buff)); 
-	  printf("Enter the string : "); 
-	  n = 0; 
-	  while ((buff[n++] = getchar()) != '\n') 
-	  ; 
-	  write(sockfd, buff, sizeof(buff)); 
-	  bzero(buff, sizeof(buff)); 
-	  read(sockfd, buff, sizeof(buff)); 
-	  printf("From Server : %s", buff); 
-	  if ((strncmp(buff, "exit", 4)) == 0) { 
-	  printf("Client Exit...\n"); 
-	  break; 
-	  } 
-	  } */
-} 
+}
+
+void makeDirectories(char* dirs) {
+	int len = strlen(dirs);
+	int i;
+	int start = 0;
+	for (i = 0; i < len; i++) {
+		if (dirs[i] == '\n') {
+			mkdir(substring(dirs,start,i),0700);
+			start = i+1;	
+		}	
+	}
+}
+ 
 char* readConf(int conFD) {
 	int status = 1;
 	int bytesRead = 0;
@@ -537,6 +619,7 @@ int removeFile(char* projName, char* filename) {
 				}
 			}
 		}
+		close(manFD2);
 		
 	}
 	close(fd);
