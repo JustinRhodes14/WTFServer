@@ -414,6 +414,37 @@ void func(int sockfd)
 			printf("Successfully returned currentversion to client\n");
 			tableFree(100);
 		}
+	} else if (compareString("commit",action) == 0) {
+		DIR *d;
+		struct dirent *dir;
+		if (!(d = opendir(project))) {
+			printf("%s does not exist on server\n",project);
+			write(sockfd,"Error",5);
+			return;
+		}
+		char* manFile = combineString(project,"/.Manifest\0");
+		int manFD = open(manFile,O_RDONLY);
+		char* manMessage = readSock(manFD);
+		char len[256];
+		sprintf(len,"%d",strlen(manMessage));
+		write(sockfd,len,sizeof(len));
+		bzero(buff,sizeof(buff));
+		read(sockfd,buff,sizeof(buff));
+		write(sockfd,manMessage,strlen(manMessage));
+			
+		bzero(buff,sizeof(buff));
+		read(sockfd,buff,sizeof(buff));
+		int length = atoi(buff);
+		write(sockfd,"Success",7);
+		char comBuf[length+1];
+		memset(comBuf,'\0',length+1);
+		read(sockfd,comBuf,length);
+		printf("Successfully recieved .Commit file\n");
+		char* comFile = combineString(project,"/.Commit\0");
+		int mitFD = open(comFile,O_WRONLY | O_CREAT | O_TRUNC);
+		writeTo(mitFD,comBuf);
+		close(mitFD);
+		close(manFD);
 	}
 }
 

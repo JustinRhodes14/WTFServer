@@ -19,6 +19,7 @@ int addFile(char*,char*);
 void checkout(char*,char*,char*);
 char* combineString(char*,char*);
 int compareString(char*,char*);
+int commit(char*,char*);
 char* compHash(char*);
 void configure(char*,char*);
 char* copyString(char*,char*);
@@ -30,6 +31,7 @@ void makeDirectories(char*);
 char* readConf(int);
 char* readManifest(int);
 int removeFile(char*,char*);
+char* readServerman(char*);
 void stopSig(int);
 char* substring(char*,int,int);
 int tableComphash(char*);
@@ -56,6 +58,8 @@ typedef struct _hashTable {
 }hashTable;
 
 hashTable* table;
+
+int hashSize = 0;
 
 void stopSig(int signum) { 
 	printf("\nStopping connection to server\n");
@@ -261,6 +265,94 @@ char* combineString(char* str1, char* str2) {
 		j++;
 	}
 	return result;
+}
+
+int commit(char* manBuff, char* project) {
+	char* clientMan = combineString(project,"/.Manifest\0");
+	int manFD = open(clientMan,O_RDONLY);
+	tableInit(100);
+	char* servVer = readServerman(manBuff);//stored in hash table	
+	char* clientManstuff = readConf(manFD);
+	close(manFD);
+	int i = 0;
+	while (clientManstuff[i] != '\n') {
+		i++;	
+	}
+	char* clientVer = substring(clientManstuff,0,i);
+	
+	
+	if (compareString(clientVer,servVer) != 0) {
+		return -1;//versions dont match
+	}
+	char* comFile = combineString(project,"/.Commit\0");
+	int mitFD = open(comFile, O_WRONLY | O_CREAT | O_TRUNC, 00600);
+	int counter = 0;
+	int start = i+1;
+	char* version = "";//0
+	char* code = "";//1
+	char* filepath = "";//2
+	char* shacode = "";//3
+	bool vers = true;
+	for (i = i+1; i < strlen(clientManstuff); i++) {
+		if (clientManstuff[i] == ' ') {
+				if (counter == 0) {	
+					version = substring(clientManstuff,start,i);
+				} else if (counter == 1) {
+					code = substring(clientManstuff,start,i);
+				} else {
+					filepath = substring(clientManstuff,start,i);	
+				}
+			
+			counter++;
+			start = i+1;
+		}
+		if (clientManstuff[i] == '\n') {
+			shacode = substring(clientManstuff,start,i);
+			start = i+1;
+			counter = 0;	
+			int t = tableSearch(filepath);
+			hashNode* temp = table->table[t];
+			while (temp) {
+				if (compareString(temp->filepath,filepath) == 0) {
+					break;
+				}
+				temp = temp->next;
+			}
+			
+			if (compareString(temp->version,version) != 0) {
+				printf("Versions don't match in one or more files, update before committing again\n");
+				remove(comFile);
+				return -1;
+			} else if (compareString(temp->code,code) != 0) {
+				if (compareString(code,"!MD\0") == 0) {
+					int fd = open(filepath,O_RDONLY);
+					char* toCode = readConf(fd);
+					char* hashedStuff = "";
+					hashedStuff = combineString(hashedStuff,compHash(toCode));
+					writeTo(mitFD,version);
+					writeTo(mitFD," \0");
+					writeTo(mitFD,code);
+					writeTo(mitFD," \0");
+					writeTo(mitFD,filepath);
+					writeTo(mitFD," \0");
+					writeTo(mitFD,hashedStuff);
+					writeTo(mitFD,"\n");
+				} else if (compareString(code,"!UT") != 0) {
+					writeTo(mitFD,version);
+					writeTo(mitFD," \0");
+					writeTo(mitFD,code);
+					writeTo(mitFD," \0");
+					writeTo(mitFD,filepath);
+					writeTo(mitFD," \0");
+					writeTo(mitFD,shacode);
+					writeTo(mitFD,"\n");
+				}
+			}
+			
+		}
+	}
+	close(mitFD);
+	return 1;//success
 }
 
 int compareString(char* str1, char* str2) {
@@ -474,7 +566,70 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 		read(sockfd,buff2,length);
 		checkout(projname,buff2,buff3);
 		printf("Successfully cloned %s.\n",projname);
-	}	
+	} else if (compareString("commit",action) == 0) {
+		DIR *d;
+		struct dirent *dir;
+		if (!(d = opendir(projname))) {
+			write(sockfd,"Error\0",6);
+			printf("%s does not exist on client\n",projname);
+			return;
+		} 
+		char* flictFile = combineString(projname,"/.Conflict\0");
+		int conFD = open(flictFile,O_RDONLY);
+		if (conFD != -1) {
+			write(sockfd,"Error\0",6);
+			printf("%s contains a .Conflict file, resolve conflicts (update) before committing\n");
+			return;
+		}
+		char* updFile = combineString(projname,"/.Update\0");
+		int updFD = open(updFile,O_RDONLY);
+		if (updFD != -1) {
+			int t = lseek(updFD,0,SEEK_END);
+			if (t != 0) {
+				write(sockfd,"Error\0",6);
+				printf("%s contains a nonempty .Update file, update before committing\n");
+				return;
+			}
+		}
+	
+	
+		char* total = combineString(action," \0");
+		total = combineString(total,projname);
+		write(sockfd,total,strlen(total));
+		bzero(buff,sizeof(buff));
+		read(sockfd,buff,sizeof(buff));//Read manifest length from server
+		if (compareString(buff,"Error") == 0) {
+			printf("%s does not exist on server\n",projname);
+		}
+		int length = atoi(buff);
+		bzero(buff,sizeof(buff));
+		write(sockfd,"I got your message\n",19);
+		char manBuff[length+1];
+		memset(manBuff,'\0',length+1);
+		read(sockfd,manBuff,length);
+		//printf("%s\n",manBuff);
+		//Manifest acquired, compare version now
+		int success = commit(manBuff,projname);//-1 on error
+		if (success == -1) {
+			write(sockfd,"Error",5);
+			return;
+		} else {
+			char* mitFile = combineString(projname,"/.Commit\0");
+			int mitFD = open(mitFile,O_RDONLY);
+			char* toSend = readConf(mitFD);
+			char sendLen[256];
+			memset(sendLen,'\0',256);
+			sprintf(sendLen,"%d",strlen(toSend));
+			write(sockfd,sendLen,sizeof(sendLen));
+			bzero(buff,sizeof(buff));
+			read(sockfd,buff,sizeof(buff));
+			write(sockfd,toSend,strlen(toSend));
+			printf("Successfully sent over .Commit file to server\n");
+			close(mitFD);
+			return;
+		}
+	}
+	close(sockfd);
 }
 
 void makeDirectories(char* dirs) {
@@ -627,6 +782,24 @@ int removeFile(char* projName, char* filename) {
 	return 1;
 }
 
+char* readServerman(char* manText) {
+	int i = 0;
+	while (manText[i] != '\n') {
+		i++;
+	}	
+	char* version = substring(manText,0,i);
+	int length = strlen(manText);
+	int start = i+1;
+	for (i = i+1;i < length; i++) {
+		if (manText[i] == '\n') {
+			extractMan(substring(manText,start,i));
+			start = i+1;
+		}
+	}
+
+	return version;
+}
+
 char* substring(char* str, int start, int end) {
 	char* result;
 	if (end == -1) {
@@ -691,6 +864,7 @@ void tableInsert(char* version, char* code, char* filepath, char* shacode) {
 	toInsert->shacode = shacode;
 	toInsert->next = temp;
 	table->table[index] = toInsert;
+	hashSize++;
 }
 
 int tableSearch(char* filepath) {
