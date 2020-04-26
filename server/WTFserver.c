@@ -22,6 +22,7 @@ char* currverr(int);
 void destroy(char*);
 void extractMan(char*);
 int extractInfo(char*); 
+void freeLL();
 void func(int);
 void listDirectories(char*);
 char* readManifest(int);
@@ -36,6 +37,12 @@ int tableSearch(char*);
 void writeTo(int,char*);
 
 char* directories = "";
+
+typedef struct _comNode {
+	char* commit;
+	char* projname;
+	struct _comNode* next;
+}comNode;
 
 typedef struct _hashNode {
 	char* version;
@@ -55,6 +62,8 @@ int hashSize = 0;
 
 int sockfd, connfd, len; 
 
+
+comNode* commits = NULL;
 
 void stopSig(int signum) {
 	printf("\nStopping connection to server and client\n");
@@ -147,6 +156,7 @@ char* checkout() {
 			toSend = combineString(toSend,temp->filepath);
 			toSend = combineString(toSend,filecontent);
 			temp = temp->next;
+			close(fd);
 		}
 	}
 	//printf("Tosend: %s\n",toSend);
@@ -224,6 +234,9 @@ int create(char* projectName) {
 		int manFD = open(manFile,O_WRONLY | O_CREAT | O_TRUNC,00600);
 		writeTo(manFD,"1\n\0");
 		close(manFD);
+		close(histFD);
+		free(histFile);
+		free(manFile);
 		printf("Successfully created %s project on server\n",projectName);
 		return 1;
 	} else {
@@ -300,6 +313,15 @@ int extractInfo(char* word) {
 	}
 	return counter;
 }
+
+void freeLL() {//need to do this for specific project commits
+	while(commits != NULL) {
+		comNode* temp = commits;
+		commits = commits->next;
+		free(temp);
+	}
+}
+
 // Function designed for chat between client and server. 
 void func(int sockfd) 
 { 
@@ -351,7 +373,6 @@ void func(int sockfd)
 			closedir(d);
 		} else {
 			listDirectories(project);
-
 			bzero(buff,sizeof(buff));
 			sprintf(buff,"%d",strlen(directories));
 			write(sockfd,buff,sizeof(buff));
@@ -437,13 +458,26 @@ void func(int sockfd)
 		int length = atoi(buff);
 		write(sockfd,"Success",7);
 		char comBuf[length+1];
-		memset(comBuf,'\0',length+1);
+		bzero(comBuf,sizeof(comBuf));
 		read(sockfd,comBuf,length);
 		printf("Successfully recieved .Commit file\n");
 		char* comFile = combineString(project,"/.Commit\0");
-		int mitFD = open(comFile,O_WRONLY | O_CREAT | O_TRUNC);
-		writeTo(mitFD,comBuf);
-		close(mitFD);
+		//int mitFD = open(comFile,O_WRONLY | O_CREAT | O_TRUNC,00600);
+		//writeTo(mitFD,comBuf);
+		if (commits == NULL) {
+			commits = (comNode*)malloc(sizeof(comNode));
+			commits->commit = comBuf;
+			commits->projname = project;
+			commits->next = NULL;
+			//printf("Commit: %s\n",commits->commit);
+		} else {
+			comNode* temp = (comNode*)malloc(sizeof(comNode));
+			temp->commit = comBuf;
+			temp ->next = commits;
+			temp->projname = project;
+			commits = temp;	
+			//printf("Commit: %s\n",commits->commit);
+		}
 		close(manFD);
 	}
 }

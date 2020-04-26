@@ -337,6 +337,10 @@ int commit(char* manBuff, char* project) {
 					writeTo(mitFD," \0");
 					writeTo(mitFD,hashedStuff);
 					writeTo(mitFD,"\n");
+					char* stdoutMsg = combineString("M \0", filepath);
+					writeTo(1,stdoutMsg);
+					writeTo(1,"\n\0");
+					free(stdoutMsg);
 				} else if (compareString(code,"!UT") != 0) {
 					writeTo(mitFD,version);
 					writeTo(mitFD," \0");
@@ -346,6 +350,15 @@ int commit(char* manBuff, char* project) {
 					writeTo(mitFD," \0");
 					writeTo(mitFD,shacode);
 					writeTo(mitFD,"\n");
+					char* stdoutMsg = "";
+					if (compareString(code,"!AD") == 0) {
+						stdoutMsg = combineString("A \0",filepath);
+					} else {
+						stdoutMsg = combineString("D \0",filepath);
+					}
+					writeTo(1,stdoutMsg);
+					writeTo(1,"\n\0");
+					free(stdoutMsg);
 				}
 			}
 			
