@@ -24,6 +24,7 @@ char* compHash(char*);
 void configure(char*,char*);
 char* copyString(char*,char*);
 int create(char*);
+char* createCom(char*);
 int extractInfo(char*);
 void extractMan(char*);
 void func(int,char*,char*,char*,int);
@@ -456,6 +457,67 @@ int create(char* projectName) {
 	}
 }
 
+char* createCom(char* comText) {
+	char* message = "sendfile:\0";
+	int fileCounter = 0;
+	int size = strlen(comText);
+	int i;
+	for (i = 0; i < size; i++) {
+		if (comText[i] == '\n') {
+			fileCounter++;
+		}
+	}
+	
+	char num[256];
+	memset(num,'\0',256);
+	sprintf(num,"%d:",fileCounter);
+	message = combineString(message,num);
+	int counter = 0;
+	int start = 0;
+	char* code;
+	for (i = 0; i < size; i++) {
+		if (comText[i] == ' ') {
+			
+			if (counter == 1) {
+				code = substring(comText,start,i);
+				message = combineString(message,code);
+				message = combineString(message,":\0");
+			} else if (counter == 2) {
+				char* filePath = substring(comText,start,i);
+				memset(num,'\0',256);
+				sprintf(num,"%d:",strlen(filePath));
+				message = combineString(message,num);
+				if (compareString(code,"!RM") == 0) {
+					memset(num,'\0',256);
+					sprintf(num,"%d:",strlen("DELETE\n\0"));
+					message = combineString(message,num);
+					message = combineString(message,filePath);
+					message = combineString(message,"DELETE\n\0");
+				} else {	
+					int fpd = open(filePath,O_RDONLY);
+					char* fileContent = readConf(fpd);	
+					memset(num,'\0',256);
+					sprintf(num,"%d:",strlen(fileContent));
+					message = combineString(message,num);
+					
+					message = combineString(message,filePath);
+					message = combineString(message,fileContent);
+					free(fileContent);
+					close(fpd);
+				}
+			}
+			start = i+1;
+			counter++;
+		}
+		if (comText[i] == '\n') {
+			counter = 0;
+			start = i+1;
+		}	
+	}
+	//printf("%s\n",message);
+	return message;
+}
+
 int extractInfo(char* word) {
 	int counter = 0;
 	while (word[counter] != '\n') {
@@ -641,6 +703,47 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 			close(mitFD);
 			return;
 		}
+	} else if (compareString("push",action) == 0) {
+		char* comFile = combineString(projname,"/.Commit\0");
+		int comFD = open(comFile,O_RDONLY);
+		if (comFD == -1) {
+			printf("No .Commit present for %s or project doesn't exist on client, commit before you push\n");
+			return;
+		}
+		char* total = combineString(action," \0");
+		total = combineString(total,projname);
+		write(sockfd,total,strlen(total));
+		bzero(buff,sizeof(buff));
+		read(sockfd,buff,sizeof(buff));
+		if (compareString("Project does not exist on server\n",buff) == 0) {
+			printf("%s\n",buff);
+			return;
+		}
+		char* comText = readConf(comFD);
+		char length[256];
+		memset(length,'\0',256);
+		sprintf(length,"%d",strlen(comText));
+		write(sockfd,length,sizeof(length));
+		bzero(buff,sizeof(buff));
+		read(sockfd,buff,sizeof(buff));
+		write(sockfd,comText,strlen(comText));
+		printf("Successfully sent commit over\n");
+		bzero(buff,sizeof(buff));
+		read(sockfd,buff,sizeof(buff));
+		if (compareString(buff,"Success") != 0) {
+			printf("Commit not present on server, commmit before you push\n");
+			close(comFD);
+			return;
+		}
+		lseek(comFD,0,SEEK_SET);
+		char* sendFile = createCom(comText);
+		memset(length,'\0',256);
+		sprintf(length,"%d",strlen(sendFile));
+		write(sockfd,length,sizeof(length));
+		bzero(buff,sizeof(buff));
+		read(sockfd,buff,sizeof(buff));
+		write(sockfd,sendFile,strlen(sendFile));//write commit message over
+		close(comFD);
 	}
 	close(sockfd);
 }

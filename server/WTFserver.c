@@ -34,6 +34,7 @@ void tableFree(int);
 void tableInit(int);
 void tableInsert(char*,char*,char*,char*);
 int tableSearch(char*);
+int traverseCommits(char*,char*);
 void writeTo(int,char*);
 
 char* directories = "";
@@ -479,6 +480,48 @@ void func(int sockfd)
 			//printf("Commit: %s\n",commits->commit);
 		}
 		close(manFD);
+	} else if (compareString("push",action) == 0) {
+		DIR *d;
+		struct dirent* dir;
+		if (!(d = opendir(project))) {
+			resultMessage = combineString(resultMessage, "Project does not exist on server\n");
+			printf("Project does not exist on server, sending error message...\n");
+			write(sockfd,resultMessage,strlen(resultMessage));
+			closedir(d);	
+			return;
+		}
+		write(sockfd,"Success",7);
+		bzero(buff,sizeof(buff));
+		read(sockfd,buff,sizeof(buff));
+		int len = atoi(buff);
+		bzero(buff,sizeof(buff));
+		write(sockfd,"Success",7);
+		char comBuf[len+1];
+		memset(comBuf,'\0',sizeof(comBuf));
+		read(sockfd,comBuf,len);
+		//printf("%s\n",comBuf); com file sent over, check linked list
+		if (commits == NULL) {
+			printf("No commits present, sending error to server\n");
+			write(sockfd,"No commits present, commit before you push\n",43);
+			return;
+		} else {
+			int success = traverseCommits(comBuf,project);
+			if (success == 1) {
+				write(sockfd,"Success",7);
+				bzero(buff,sizeof(buff));
+				read(sockfd,buff,sizeof(buff));
+				int lenFiles = atoi(buff);
+				write(sockfd,"Success",7);
+				char fileBuf[lenFiles+1];	
+				memset(fileBuf,'\0',lenFiles+1);
+				read(sockfd,fileBuf,lenFiles);
+				printf("%s\n",fileBuf);
+				printf("%d\n",push(fileBuf));
+			} else {
+				write(sockfd,"No commits matched, commit before you push\n",43);
+			}
+		}
+			
 	}
 }
 
@@ -501,6 +544,55 @@ void listDirectories(char* path) {
 		}	
 	}
 	closedir(d);
+}
+
+int push(char* message) {
+	message = substring(message,10,-1);//extracts sendfile: portion
+	int end = 0;
+	while (message[end] != ':') {
+		end++;	
+	}
+	int length = strlen(message);
+	int i;
+	int counter = 0;
+	char* code;
+	int fileSize = 0;
+	int fileBytes = 0;
+	int start = end+1;
+	printf("MSG: %s\n",substring(message,start,-1));
+	for (i = end + 1; i < length; i++) {
+		if (message[i] == ':') {
+			if (counter == 0) {
+				code = substring(message,start,i);
+				printf("%s\n",code);
+			} else if (counter == 1) {
+				printf("%s\n",substring(message,start,i));
+				fileSize = atoi(substring(message,start,i));
+				printf("fsize: %d\n",fileSize);
+			} else if (counter == 2) {
+				printf("%s\n",substring(message,start,i));
+				fileBytes = atoi(substring(message,start,i));
+				printf("fbytes: %d\n",fileBytes);
+			}
+			counter++;
+			start = i+1;
+		}
+		if (counter == 3) {
+			if (compareString(code, "!RM\0") == 0) {
+				remove(substring(message,i+1,(i+1+fileSize)));
+			} else {
+				int fd = open(substring(message,i+1,(i+1+fileSize)),O_WRONLY | O_CREAT | O_TRUNC, 00600);
+				writeTo(fd,substring(message,(i+1+fileSize),(i+1+fileSize+fileBytes)));
+				close(fd);
+			}
+			counter = 0;
+			start = i+1+fileSize+fileBytes;
+			
+			printf("HELLO %s\n",substring(message,start,-1));
+		}
+	}
+	
+	return 1;
 }
 
 char* readManifest(int manFD) {
@@ -674,6 +766,20 @@ int tableSearch(char* filepath) {
 		temp2 = temp2->next;
 	}
 	return -1;	
+}
+
+int traverseCommits(char* commit, char* project) {
+	comNode* temp = commits;
+	while (temp != NULL) {
+		if (compareString(temp->projname,project) == 0){ 
+			if (compareString(temp->commit,commit) == 0) {
+				//success
+				return 1;
+			}
+		}
+		temp = temp->next;
+	}
+	return -1;
 }
 
 void writeTo(int fd, char* word) {
