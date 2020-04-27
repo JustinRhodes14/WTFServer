@@ -764,7 +764,8 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 		updateManifest(comText,projname,num);
 		int newMan = open(combineString(projname,"/.Manifest\0"),O_RDONLY);
 		char* newMantext = readConf(newMan);
-			
+		//printf("%s\n",newMantext);		
+		
 		memset(length,'\0',256);
 		sprintf(length,"%d",strlen(newMantext));
 		write(sockfd,length,sizeof(length));

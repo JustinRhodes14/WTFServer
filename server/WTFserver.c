@@ -531,7 +531,7 @@ void func(int sockfd)
 				tableFree(100);
 				close(manFD);
 				
-				int newMan = open(combineString(project,"/.Manifest\0"),O_RDONLY);
+				int newMan = open(combineString(project,"/.Manifest\0"),O_WRONLY | O_CREAT | O_TRUNC);
 				bzero(buff,sizeof(buff));
 				read(sockfd,buff,sizeof(buff));
 				write(sockfd,"Success",7);
@@ -540,6 +540,7 @@ void func(int sockfd)
 				memset(manText,'\0',manLen+1);
 				read(sockfd,manText,manLen);
 				writeTo(newMan,manText);
+				
 				printf("Successful push\n");
 				//just gotta free LL for this now
 			} else {
