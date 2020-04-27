@@ -230,12 +230,11 @@ int create(char* projectName) {
 	if (stat(projectName, &st) == -1) {
 		mkdir(projectName,0700);
 		char* histFile = combineString(projectName,"/.History\0");
-		int histFD = open(histFile, O_WRONLY | O_CREAT | O_TRUNC,00600);
+		mkdir(histFile,0700);
 		char* manFile = combineString(projectName,"/.Manifest\0");
 		int manFD = open(manFile,O_WRONLY | O_CREAT | O_TRUNC,00600);
 		writeTo(manFD,"1\n\0");
 		close(manFD);
-		close(histFD);
 		free(histFile);
 		free(manFile);
 		printf("Successfully created %s project on server\n",projectName);
@@ -507,6 +506,19 @@ void func(int sockfd)
 		} else {
 			int success = traverseCommits(comBuf,project);
 			if (success == 1) {
+				char* sysMessage = combineString("rsync -Rr \0",project);
+				char* dest = combineString(project,"/.History/\0");
+				tableInit(100);
+				int manFD = open(combineString(project,"/.Manifest\0"),O_RDONLY);
+				char* num = readManifest(manFD);
+				dest = combineString(dest,num);
+				mkdir(dest,0700);//makes history directory
+				sysMessage = combineString(sysMessage, " \0");
+				sysMessage = combineString(sysMessage, dest);
+				system(sysMessage);
+	
+
+				
 				write(sockfd,"Success",7);
 				bzero(buff,sizeof(buff));
 				read(sockfd,buff,sizeof(buff));
@@ -515,8 +527,9 @@ void func(int sockfd)
 				char fileBuf[lenFiles+1];	
 				memset(fileBuf,'\0',lenFiles+1);
 				read(sockfd,fileBuf,lenFiles);
-				printf("%s\n",fileBuf);
 				printf("%d\n",push(fileBuf));
+				tableFree(100);
+				close(manFD);
 			} else {
 				write(sockfd,"No commits matched, commit before you push\n",43);
 			}
@@ -559,20 +572,14 @@ int push(char* message) {
 	int fileSize = 0;
 	int fileBytes = 0;
 	int start = end+1;
-	printf("MSG: %s\n",substring(message,start,-1));
 	for (i = end + 1; i < length; i++) {
 		if (message[i] == ':') {
 			if (counter == 0) {
 				code = substring(message,start,i);
-				printf("%s\n",code);
 			} else if (counter == 1) {
-				printf("%s\n",substring(message,start,i));
 				fileSize = atoi(substring(message,start,i));
-				printf("fsize: %d\n",fileSize);
 			} else if (counter == 2) {
-				printf("%s\n",substring(message,start,i));
 				fileBytes = atoi(substring(message,start,i));
-				printf("fbytes: %d\n",fileBytes);
 			}
 			counter++;
 			start = i+1;
@@ -588,7 +595,6 @@ int push(char* message) {
 			counter = 0;
 			start = i+1+fileSize+fileBytes;
 			
-			printf("HELLO %s\n",substring(message,start,-1));
 		}
 	}
 	

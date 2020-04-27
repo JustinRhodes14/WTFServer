@@ -39,6 +39,7 @@ int tableComphash(char*);
 void tableInit(int);
 void tableInsert(char*,char*,char*,char*);
 int tableSearch(char*);
+void updateManifest(char*,char*,char*);
 void writeTo(int,char*);
 
 typedef unsigned char byte;
@@ -445,7 +446,7 @@ int create(char* projectName) {
 	if (stat(projectName,&st) == -1) {
 		mkdir(projectName,0700);
 		char* histFile = combineString(projectName,"/.History\0");
-		int histFD = open(histFile, O_WRONLY | O_CREAT | O_TRUNC, 00600);
+		mkdir(histFile,0700);
 		char* manFile = combineString(projectName,"/.Manifest\0");
 		int manFD = open(manFile,O_WRONLY | O_CREAT | O_TRUNC, 00600);
 		writeTo(manFD,"1\n\0");
@@ -735,6 +736,21 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 			close(comFD);
 			return;
 		}
+		
+		char* sysMessage = combineString("rsync -Rr \0",projname);
+		char* dest = combineString(projname,"/.History/\0");
+		tableInit(100);
+		int manFD = open(combineString(projname,"/.Manifest\0"),O_RDONLY);
+		char* num = readManifest(manFD);
+		dest = combineString(dest,num);
+		mkdir(dest,0700);
+		sysMessage = combineString(sysMessage," \0");
+		sysMessage = combineString(sysMessage,dest);
+		system(sysMessage);	
+	
+
+
+	
 		lseek(comFD,0,SEEK_SET);
 		char* sendFile = createCom(comText);
 		memset(length,'\0',256);
@@ -743,6 +759,10 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 		bzero(buff,sizeof(buff));
 		read(sockfd,buff,sizeof(buff));
 		write(sockfd,sendFile,strlen(sendFile));//write commit message over
+		close(manFD);
+		//clean up manifest
+		updateManifest(comText,projname,num);
+		
 		close(comFD);
 	}
 	close(sockfd);
@@ -999,6 +1019,85 @@ int tableSearch(char* filepath) {
 		temp2 = temp2->next;
 	}
 	return -1;	
+}
+
+void updateManifest(char* commit,char* project,char* num) {
+	//printf("%s\n",commit);
+	int length = strlen(commit);
+	int mVers = atoi(num) + 1;
+	char newNum[256];
+	memset(newNum,'\0',256);
+	sprintf(newNum,"%d\n",mVers);
+	char* manFile = combineString(project,"/.Manifest\0");
+	int manFD = open(manFile,O_WRONLY | O_CREAT | O_TRUNC,00600);
+	writeTo(manFD,newNum);
+	int i;
+	int counter = 0;
+	int version = 0;
+	char* code;
+	char* filepath;
+	char* shacode;
+	int start = 0;
+	for (i = 0; i < length; i++) {
+		if (commit[i] == ' ' || commit[i] == '\n') {
+			if (counter == 0) {
+				version = atoi(substring(commit,start,i)) + 1;
+				//printf("%d\n",version);
+			} else if (counter == 1) {
+				code = substring(commit,start,i);
+			} else if (counter == 2) {
+				filepath = substring(commit,start,i);
+			} else if (counter == 3) {
+				shacode = substring(commit,start,i);
+			}
+			start = i+1;
+			counter++;
+		}	
+		if (counter == 4) {
+			int index = tableSearch(filepath);
+			hashNode* temp = table->table[index];
+			while (temp != NULL) {
+				if (compareString(temp->filepath,filepath) == 0) {
+					temp->code = "!DL\0";
+					break;
+				}
+				temp = temp->next;
+			}
+			if (compareString(code,"!AD\0") == 0 || compareString(code,"!MD\0") == 0) {
+				memset(newNum,'\0',256);
+				sprintf(newNum,"%d ",version);
+				writeTo(manFD,newNum);
+				writeTo(manFD,"!UT \0");
+				writeTo(manFD,filepath);
+				writeTo(manFD," \0");
+				writeTo(manFD,shacode);
+				writeTo(manFD,"\n\0");
+			}
+			if (compareString(code,"!RM\0") == 0) {
+				continue;
+			}
+			start = i+1;
+			counter = 0;
+				
+		}
+	}
+		
+	for (i = 0; i < table->size; i++) {
+		hashNode* temp2 = table->table[i];
+		while (temp2 != NULL) {
+			if (compareString(temp2->code,"!DL\0") != 0) {
+				writeTo(manFD,temp2->version);
+				writeTo(manFD," \0");
+				writeTo(manFD,"!UT\0");
+				writeTo(manFD," \0");
+				writeTo(manFD,temp2->filepath);
+				writeTo(manFD," \0");
+				writeTo(manFD,temp2->shacode);
+				writeTo(manFD,"\n\0");
+			}
+			temp2 = temp2->next;
+		}	
+	}
 }
 
 void writeTo(int fd, char* word) {
