@@ -762,7 +762,18 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 		close(manFD);
 		//clean up manifest
 		updateManifest(comText,projname,num);
-		
+		int newMan = open(combineString(projname,"/.Manifest\0"),O_RDONLY);
+		char* newMantext = readConf(newMan);
+			
+		memset(length,'\0',256);
+		sprintf(length,"%d",strlen(newMantext));
+		write(sockfd,length,sizeof(length));
+		bzero(buff,sizeof(buff));
+		read(sockfd,buff,sizeof(buff));
+		write(sockfd,newMantext,strlen(newMantext));
+		printf("Successful push\n");
+		remove(comFile);
+		close(newMan);
 		close(comFD);
 	}
 	close(sockfd);

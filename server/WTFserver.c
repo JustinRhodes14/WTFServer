@@ -530,6 +530,18 @@ void func(int sockfd)
 				printf("%d\n",push(fileBuf));
 				tableFree(100);
 				close(manFD);
+				
+				int newMan = open(combineString(project,"/.Manifest\0"),O_RDONLY);
+				bzero(buff,sizeof(buff));
+				read(sockfd,buff,sizeof(buff));
+				write(sockfd,"Success",7);
+				int manLen = atoi(buff);
+				char manText[manLen+1];
+				memset(manText,'\0',manLen+1);
+				read(sockfd,manText,manLen);
+				writeTo(newMan,manText);
+				printf("Successful push\n");
+				//just gotta free LL for this now
 			} else {
 				write(sockfd,"No commits matched, commit before you push\n",43);
 			}
