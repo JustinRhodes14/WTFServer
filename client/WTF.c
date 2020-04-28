@@ -785,6 +785,27 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 	close(sockfd);
 }
 
+void listDirectories(char* path) {
+	DIR *d;
+	struct dirent *dir;
+	if (!(d = opendir(path))) {
+		return;
+	}
+	while ((dir = readdir(d)) != NULL) {
+		if (dir->d_type == DT_DIR) {
+			if (compareString(dir->d_name,".") == 0 || compareString(dir->d_name,"..") == 0) {
+				continue;	
+			}
+			char* temp = combineString(path,"/");
+			temp = combineString(temp,dir->d_name);
+			directories = combineString(directories,temp);
+			directories = combineString(directories,"\n\0");
+			listDirectories(temp);
+		}	
+	}
+	closedir(d);
+}
+
 void makeDirectories(char* dirs) {
 	int len = strlen(dirs);
 	int i;
