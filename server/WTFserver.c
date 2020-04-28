@@ -25,6 +25,7 @@ int extractInfo(char*);
 void freeLL();
 void func(int);
 void listDirectories(char*);
+void makeDirectories(char*);
 char* readManifest(int);
 char* readSock(int); 
 void stopSig(int);
@@ -570,6 +571,18 @@ void listDirectories(char* path) {
 		}	
 	}
 	closedir(d);
+}
+
+void makeDirectories(char* dirs) {
+	int len = strlen(dirs);
+	int i;
+	int start = 0;
+	for (i = 0; i < len; i++) {
+		if (dirs[i] == '\n') {
+			mkdir(substring(dirs,start,i),0700);
+			start = i+1;	
+		}	
+	}
 }
 
 int push(char* message) {
