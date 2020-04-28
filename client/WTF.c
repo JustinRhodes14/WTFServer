@@ -126,8 +126,8 @@ int main(int argc, char** argv)
 		printf("connected to the server..\n"); 
 
 	// function for chat 
-	if (argc == 3) {
-		func(sockfd,argv[1],argv[2],NULL,-1);
+	if (argc == 3 || argc == 4) {
+		func(sockfd,argv[1],argv[2],argv[3],-1);
 	}
 	// close the socket
 	close(sockfd); 
@@ -834,6 +834,19 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 		read(sockfd,opsLen,len);
 		printf("%s",opsLen);
 			
+	} else if (compareString(action,"rollback") == 0) {
+		char* total = combineString(action," \0");
+		total = combineString(total,projname);
+		total = combineString(total," \0");
+		total = combineString(total,fname);
+		printf("%s\n",total);
+		write(sockfd,total,strlen(total));
+		bzero(buff,sizeof(buff));
+		read(sockfd,buff,sizeof(buff));
+		if (compareString(buff,"Error") == 0) {
+			printf("Project is already on current version or version requested is further than current version of server\n");
+			return;
+		}	
 	}
 	close(sockfd);
 }
