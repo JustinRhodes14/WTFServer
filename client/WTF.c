@@ -28,6 +28,7 @@ char* createCom(char*);
 int extractInfo(char*);
 void extractMan(char*);
 void func(int,char*,char*,char*,int);
+void listDirectories(char*);
 void makeDirectories(char*);
 char* readConf(int);
 char* readManifest(int);
