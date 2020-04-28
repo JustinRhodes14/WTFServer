@@ -63,6 +63,8 @@ hashTable* table;
 
 int hashSize = 0;
 
+char* directories = "";
+
 void stopSig(int signum) { 
 	printf("\nStopping connection to server\n");
 	(void) signal(SIGINT,SIG_DFL);
@@ -281,9 +283,9 @@ int commit(char* manBuff, char* project) {
 		i++;	
 	}
 	char* clientVer = substring(clientManstuff,0,i);
-	
-	
-	if (compareString(clientVer,servVer) != 0) {
+	int serv = atoi (servVer);
+	int clien = atoi(clientVer);
+	if (serv != clien) {
 		return -1;//versions dont match
 	}
 	char* comFile = combineString(project,"/.Commit\0");
@@ -314,18 +316,21 @@ int commit(char* manBuff, char* project) {
 			counter = 0;	
 			int t = tableSearch(filepath);
 			hashNode* temp = table->table[t];
-			while (temp) {
+			while (temp != NULL && (hashSize != 0 && hashSize != -1)) {
 				if (compareString(temp->filepath,filepath) == 0) {
 					break;
 				}
 				temp = temp->next;
 			}
 			
-			if (compareString(temp->version,version) != 0) {
-				printf("Versions don't match in one or more files, update before committing again\n");
-				remove(comFile);
-				return -1;
-			} else if (compareString(temp->code,code) != 0) {
+			if (hashSize != 0 && hashSize != -1) {
+				if (compareString(temp->version,version) != 0 && (hashSize != -1 && hashSize != 0)) {
+					printf("Versions don't match in one or more files, update before committing again\n");
+					remove(comFile);
+					return -1;
+				}
+			}
+			 if ((hashSize == -1 || hashSize == 0) || compareString(temp->code,code) != 0) {
 				if (compareString(code,"!MD\0") == 0) {
 					int fd = open(filepath,O_RDONLY);
 					char* toCode = readConf(fd);
@@ -932,9 +937,14 @@ int removeFile(char* projName, char* filename) {
 
 char* readServerman(char* manText) {
 	int i = 0;
-	while (manText[i] != '\n') {
+	while (i < strlen(manText) && manText[i] != '\n') {
 		i++;
-	}	
+	}
+	if ((i+1) == strlen(manText)) {
+		char* version = manText;
+		hashSize = -1;
+		return version;
+	}
 	char* version = substring(manText,0,i);
 	int length = strlen(manText);
 	int start = i+1;
@@ -1053,7 +1063,7 @@ void updateManifest(char* commit,char* project,char* num) {
 	for (i = 0; i < length; i++) {
 		if (commit[i] == ' ' || commit[i] == '\n') {
 			if (counter == 0) {
-				version = atoi(substring(commit,start,i)) + 1;
+				version = atoi(substring(commit,start,i));
 				//printf("%d\n",version);
 			} else if (counter == 1) {
 				code = substring(commit,start,i);
@@ -1077,16 +1087,27 @@ void updateManifest(char* commit,char* project,char* num) {
 			}
 			if (compareString(code,"!AD\0") == 0 || compareString(code,"!MD\0") == 0) {
 				memset(newNum,'\0',256);
+				version += 1;
 				sprintf(newNum,"%d ",version);
 				writeTo(manFD,newNum);
-				writeTo(manFD,"!UT \0");
+				writeTo(manFD,code);
+				writeTo(manFD," \0");
 				writeTo(manFD,filepath);
 				writeTo(manFD," \0");
 				writeTo(manFD,shacode);
 				writeTo(manFD,"\n\0");
 			}
 			if (compareString(code,"!RM\0") == 0) {
-				continue;
+				memset(newNum,'\0',256);
+				version += 1;
+				sprintf(newNum,"%d ",version);
+				writeTo(manFD,newNum);
+				writeTo(manFD,code);
+				writeTo(manFD," \0");
+				writeTo(manFD,filepath);
+				writeTo(manFD," \0");
+				writeTo(manFD,"DELETE\0");
+				writeTo(manFD,"\n\0");
 			}
 			start = i+1;
 			counter = 0;

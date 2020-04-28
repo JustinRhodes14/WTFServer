@@ -1,0 +1,4 @@
+3
+3 !RM Project1/test1.txt DELETE
+2 !UT Project1/test2.txt da52ff58181b3638de7712926bdc2f87f13fd113d9dc8c6cc969452d576de3c7
+2 !UT Project1/test3.txt DELETE
