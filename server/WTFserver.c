@@ -232,6 +232,9 @@ int create(char* projectName) {
 		mkdir(projectName,0700);
 		char* histFile = combineString(projectName,"/.History\0");
 		mkdir(histFile,0700);
+		char* opsFile = combineString(projectName,"/.Operations\0");
+		int opsFD = open(opsFile,O_WRONLY | O_CREAT | O_TRUNC,00600);
+		close(opsFD);
 		char* manFile = combineString(projectName,"/.Manifest\0");
 		int manFD = open(manFile,O_WRONLY | O_CREAT | O_TRUNC,00600);
 		writeTo(manFD,"1\n\0");
@@ -517,11 +520,23 @@ void func(int sockfd)
 				sysMessage = combineString(sysMessage, " \0");
 				sysMessage = combineString(sysMessage, dest);
 				system(sysMessage);
-	
-
 				
 				write(sockfd,"Success",7);
 				bzero(buff,sizeof(buff));
+				
+				read(sockfd,buff,sizeof(buff));
+				if (compareString(buff,"empty") == 0) {
+					write(sockfd,"noted",5);
+				} else {
+					int lenDirs = atoi(buff);
+					char dirs[lenDirs + 1];
+					memset(dirs,'\0',lenDirs+1);
+					write(sockfd,"Success",7);
+					read(sockfd,dirs,lenDirs);
+					makeDirectories(dirs);
+				}
+				bzero(buff,sizeof(buff));
+				
 				read(sockfd,buff,sizeof(buff));
 				int lenFiles = atoi(buff);
 				write(sockfd,"Success",7);
@@ -542,6 +557,11 @@ void func(int sockfd)
 				read(sockfd,manText,manLen);
 				writeTo(newMan,manText);
 				
+
+				char* ops = combineString(project,"/.Operations");
+				int opsFD = open(ops,O_WRONLY);
+				lseek(opsFD,0,SEEK_END);
+				writeTo(opsFD,comBuf);
 				printf("Successful push\n");
 				//just gotta free LL for this now
 			} else {
@@ -549,6 +569,60 @@ void func(int sockfd)
 			}
 		}
 			
+	} else if (compareString(action,"update") == 0) {
+		DIR *d;
+		struct dirent dir;
+		if (!(d = opendir(project))) {
+			printf("%s does not exist on server\n",project);
+			write(sockfd,"Error",5);
+			return;
+		}
+			
+	} else if (compareString(action,"history") == 0) {
+		DIR *d;
+		struct dirent dir;
+		if (!(d = opendir(project))) {
+			printf("%s does not exist on server\n",project);
+			write(sockfd,"Error",5);
+			return;
+		}
+		char* ops = combineString(project,"/.Operations");
+		int opsFD = open(ops,O_RDONLY);
+		char* opsText = readSock(opsFD);
+		char len[256];
+		memset(len,'\0',256);
+		if (strlen(opsText) <= 1) {
+			write(sockfd,"Empty",5);
+			return;
+		}
+		sprintf(len,"%d",strlen(opsText));
+		write(sockfd,len,sizeof(len));
+		bzero(buff,sizeof(buff));
+		read(sockfd,buff,sizeof(buff));
+		write(sockfd,opsText,strlen(opsText));
+		printf("Successfully returned history to client\n");
+	} else if (compareString(action,"rollback") == 0) {
+		int split2 = extractInfo(project);
+		char* version = substring(project,split2 + 1,-1);
+		project = substring(project,0,split2);
+		DIR *d;
+		struct dirent dir;
+		if (!(d = opendir(project))) {
+			printf("%s does not exist on server\n",project);
+			write(sockfd,"Error",5);
+			return;
+		}
+		char* man = combineString(project,"/.Manifest");
+		tableInit(100);
+		int manFD = open(man,O_RDONLY);
+		char* num = readManifest(manFD);
+		tableFree(100);
+		if (compareString(num,version) <= 0) {
+			printf("Can't rollback, versions are the same or requested version is greater than current\n");
+			write(sockfd,"Error",5);
+			return;
+		}
+		
 	}
 }
 

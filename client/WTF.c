@@ -100,7 +100,7 @@ int main(int argc, char** argv)
 	int split = extractInfo(confInfo);
 	char* ip = substring(confInfo,0,split);
 	int port = atoi(substring(confInfo,split+1,-1));
-	printf("IP: %s, PORT: %d\n",ip,port);
+	//printf("IP: %s, PORT: %d\n",ip,port);
 	struct sockaddr_in servaddr, cli; 
 	// socket create and varification 
 	sockfd = socket(AF_INET, SOCK_STREAM, 0); 
@@ -453,6 +453,9 @@ int create(char* projectName) {
 		mkdir(projectName,0700);
 		char* histFile = combineString(projectName,"/.History\0");
 		mkdir(histFile,0700);
+		char* opsFile = combineString(projectName,"/.Operations\0");
+		int opsFD = open(opsFile, O_WRONLY | O_CREAT | O_TRUNC,00600);
+		close(opsFD);
 		char* manFile = combineString(projectName,"/.Manifest\0");
 		int manFD = open(manFile,O_WRONLY | O_CREAT | O_TRUNC, 00600);
 		writeTo(manFD,"1\n\0");
@@ -753,8 +756,20 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 		sysMessage = combineString(sysMessage," \0");
 		sysMessage = combineString(sysMessage,dest);
 		system(sysMessage);	
-	
-
+		listDirectories(projname);
+		
+		if (strlen(directories) <= 1) {
+			write(sockfd,"empty",5);
+		} else {
+			char lenbufferthing[256];
+			memset(lenbufferthing,'\0',256);
+			sprintf(lenbufferthing,"%d",strlen(directories));
+			write(sockfd,lenbufferthing,sizeof(lenbufferthing));	
+			bzero(buff,sizeof(buff));
+			read(sockfd,buff,sizeof(buff));
+			write(sockfd,directories,strlen(directories));
+		}
+		bzero(buff,sizeof(buff));
 
 	
 		lseek(comFD,0,SEEK_SET);
@@ -782,6 +797,43 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 		remove(comFile);
 		close(newMan);
 		close(comFD);
+	} else if (compareString(action,"update") == 0) {
+		DIR *d;
+		struct dirent dir;
+		if (!(d = opendir(projname))) {
+			printf("%s does not exist on client\n",projname);
+			return;
+		}
+		char* total = combineString(action," \0");
+		total = combineString(total,projname);
+		write(sockfd,total,strlen(total));
+		bzero(buff,sizeof(buff));
+		read(sockfd,buff,sizeof(buff));
+		if (compareString(buff,"Error") == 0) {
+			printf("Project does not exist on server\n");
+			return;
+		}
+			
+	} else if (compareString(action,"history") == 0) {
+		char* total = combineString(action," \0");
+		total = combineString(total,projname);
+		write(sockfd,total,strlen(total));
+		bzero(buff,sizeof(buff));
+		read(sockfd,buff,sizeof(buff));
+		if (compareString(buff,"Error") == 0) {
+			printf("Project does not exist on server\n");
+			return;
+		} else if (compareString(buff,"Empty") == 0) {
+			printf("Project does not have a history\n");
+			return;
+		}
+		int len = atoi(buff);
+		char opsLen[len + 1];
+		memset(opsLen,'\0',len+1);
+		write(sockfd,"Success",7);
+		read(sockfd,opsLen,len);
+		printf("%s",opsLen);
+			
 	}
 	close(sockfd);
 }
@@ -794,7 +846,7 @@ void listDirectories(char* path) {
 	}
 	while ((dir = readdir(d)) != NULL) {
 		if (dir->d_type == DT_DIR) {
-			if (compareString(dir->d_name,".") == 0 || compareString(dir->d_name,"..") == 0) {
+			if (compareString(dir->d_name,".") == 0 || compareString(dir->d_name,"..") == 0 || compareString(dir->d_name,".History") == 0) {
 				continue;	
 			}
 			char* temp = combineString(path,"/");
