@@ -622,7 +622,25 @@ void func(int sockfd)
 			write(sockfd,"Error",5);
 			return;
 		}
-		
+		system("mkdir .temp\0");
+		char* rolled = combineString(project,"/.History/\0");
+		rolled = combineString(rolled,version);
+		rolled = combineString(rolled,"/\0");
+		rolled = combineString(rolled,project);
+		char* com1 = combineString("cp -avr \0",rolled);
+		com1 = combineString(com1," .temp\0");
+		system(com1);
+		free(com1);
+		char* com2 = combineString("rm -r \0",project);
+		system(com2);
+		free(com2);
+		char* com3 = combineString("cp -avr .temp/\0",project);
+		com3 = combineString(com3," ./\0");
+		system(com3);
+		free(com3);
+		system("rm -r .temp\0");
+		printf("we made it\n");
+		write(sockfd,"Success",7);
 	}
 }
 

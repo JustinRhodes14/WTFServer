@@ -839,14 +839,15 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 		total = combineString(total,projname);
 		total = combineString(total," \0");
 		total = combineString(total,fname);
-		printf("%s\n",total);
+		//printf("%s\n",total);
 		write(sockfd,total,strlen(total));
 		bzero(buff,sizeof(buff));
 		read(sockfd,buff,sizeof(buff));
 		if (compareString(buff,"Error") == 0) {
 			printf("Project is already on current version or version requested is further than current version of server\n");
 			return;
-		}	
+		}
+		printf("Successfully reverted to version %s on server\n",fname);	
 	}
 	close(sockfd);
 }
