@@ -148,6 +148,10 @@ char* checkout() {
 	for (i = 0; i < table->size; i++) {
 		hashNode* temp = table->table[i];
 		while (temp) {
+			if (compareString(temp->shacode,"DELETE\0") == 0) {
+				temp = temp->next;
+				continue;
+			}
 			int length = strlen(temp->filepath);
 			int fd = open(temp->filepath,O_RDONLY);
 			char* filecontent = readSock(fd);
@@ -379,10 +383,17 @@ void func(int sockfd)
 			listDirectories(project);
 			bzero(buff,sizeof(buff));
 			sprintf(buff,"%d",strlen(directories));
-			write(sockfd,buff,sizeof(buff));
-			bzero(buff,sizeof(buff));
-			read(sockfd,buff,sizeof(buff));
-			write(sockfd,directories,strlen(directories));
+			if (strlen(directories) <= 1) {
+				write(sockfd,"empty",5);
+			} else {
+				write(sockfd,buff,sizeof(buff));
+				bzero(buff,sizeof(buff));
+				read(sockfd,buff,sizeof(buff));
+				write(sockfd,directories,strlen(directories));
+				directories = "";
+			}
+			//printf("directories: %s\n",directories);
+
 			
 			tableInit(100);
 			char* manFile = combineString(project,"/.Manifest\0");
@@ -394,12 +405,13 @@ void func(int sockfd)
 			bzero(buff,sizeof(buff));
 			read(sockfd,buff,sizeof(buff));
 			write(sockfd,manText,strlen(manText));
-
+			//printf("Manifest: %s\n",manText);
 
 			lseek(manFD,0,SEEK_SET);
 			readManifest(manFD);
 			close(manFD);
 			char* message = checkout();
+			//printf("message: %s\n",message);
 			bzero(buff,sizeof(buff));
 			sprintf(buff,"%d",strlen(message));
 			write(sockfd,buff,sizeof(buff));
@@ -661,7 +673,7 @@ void listDirectories(char* path) {
 	}
 	while ((dir = readdir(d)) != NULL) {
 		if (dir->d_type == DT_DIR) {
-			if (compareString(dir->d_name,".") == 0 || compareString(dir->d_name,"..") == 0) {
+			if (compareString(dir->d_name,".") == 0 || compareString(dir->d_name,"..") == 0 || compareString(dir->d_name,".History") == 0) {
 				continue;	
 			}
 			char* temp = combineString(path,"/");
@@ -883,7 +895,9 @@ void tableInsert(char* version, char* code, char* filepath, char* shacode) {
 	toInsert->shacode = shacode;
 	toInsert->next = temp;
 	table->table[index] = toInsert;
-	hashSize++;
+	if (compareString(toInsert->shacode,"DELETE\0") != 0) {	
+		hashSize++;
+	}
 }
 
 int tableSearch(char* filepath) {

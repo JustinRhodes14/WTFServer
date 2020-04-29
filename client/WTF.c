@@ -623,19 +623,21 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 			return;
 		}
 		mkdir(projname,0700);
-		//directories
-		int length = atoi(buff);
-		write(sockfd,"I got your message\n",19);
-		char buff4[length + 1];
-		bzero(buff4,sizeof(buff4));
-		read(sockfd,buff4,sizeof(buff4));
-		//printf("%s\n",buff4);
-		makeDirectories(buff4);
+		if (compareString(buff,"empty") != 0) {
+			//directories
+			int length2 = atoi(buff);
+			write(sockfd,"I got your message\n",19);
+			char buff4[length2 + 1];
+			bzero(buff4,sizeof(buff4));
+			read(sockfd,buff4,sizeof(buff4));
+			//printf("%s\n",buff4);
+			makeDirectories(buff4);
+		}
 		
 		//manifest
 		bzero(buff,sizeof(buff));
 		read(sockfd,buff,sizeof(buff));
-		length = atoi(buff);
+		int length = atoi(buff);
 		write(sockfd,"I got your message\n",19);
 		char buff3[length + 1];
 		bzero(buff3,sizeof(buff3));
@@ -820,11 +822,17 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 		memset(manbuff,'\0',length+1);
 		write(sockfd,"Success",7);
 		read(sockfd,manbuff,length);
-		printf("manbuff: %s\n",manbuff);
+		//printf("manbuff: %s\n",manbuff);
 		tableInit(100);
 		int clientFD = open(combineString(projname,"/.Manifest\0"),O_RDONLY);
 		char* ver = readManifest(clientFD);
 		int success = update(projname,manbuff,ver);
+		if (success == 2) {
+			printf(".Conflict file created, fix conflicts before updating\n");
+		} else if (success == 1) {
+			printf(".Update file successfully created with list of required updates\n");
+		}
+		return;
 			
 	} else if (compareString(action,"history") == 0) {
 		char* total = combineString(action," \0");
@@ -1154,7 +1162,7 @@ int tableSearch(char* filepath) {
 
 int update(char* project, char* serverMan, char* clientVer) {
 	int sevLength = strlen(serverMan);
-	printf("hello:%s:hello\n",serverMan);
+	//printf("hello:%s:hello\n",serverMan);
 	int i = 0;
 	int start = 0;
 	int counter = 0;
@@ -1175,7 +1183,6 @@ int update(char* project, char* serverMan, char* clientVer) {
 		printf("No updates necessary, server manifest is empty\n");
 		return 1;//empty server manifest
 	}
-	start = i+1;
 	if (compareString(sversion,clientVer) == 0) {
 		write(1,"Up to Date\n\0",12);
 		int updFile = open(combineString(project,"/.Update"),O_WRONLY | O_CREAT | O_TRUNC,00600);
@@ -1204,7 +1211,6 @@ int update(char* project, char* serverMan, char* clientVer) {
 			}
 			if (counter == 4) {
 				//all data stored
-				counter = 0;
 				if (tableSearch(filepath) != -1) {//found
 					char* freshHash = liveHash(filepath);
 					int index = tableComphash(filepath);
@@ -1221,6 +1227,7 @@ int update(char* project, char* serverMan, char* clientVer) {
 							remove(combineString(project,"/.Update\0"));
 							conflict = true;
 							printf("conflict created\n");
+							return 2;
 						}
 						char* message = combineString(version," \0");
 						message = combineString(message,"!CF \0");
@@ -1230,6 +1237,7 @@ int update(char* project, char* serverMan, char* clientVer) {
 						message = combineString(message,"\n\0");
 						writeTo(flictFD,message);
 						writeTo(1,message);
+						counter = 0;
 					} else if (compareString(freshHash,temp->shacode) == 0 && compareString(freshHash,shacode) != 0) {
 						char* message = combineString(version," \0");
 						if (compareString(shacode,"DELETE\0") == 0) {
@@ -1244,7 +1252,8 @@ int update(char* project, char* serverMan, char* clientVer) {
 						message = combineString(message,"\n\0");
 						writeTo(updFile,message);
 						writeTo(1,message);
-						updateCounter++;	
+						updateCounter++;
+						counter = 0;	
 					}
 					
 					
@@ -1259,15 +1268,12 @@ int update(char* project, char* serverMan, char* clientVer) {
 					writeTo(updFile,message);
 					writeTo(1,message);
 					updateCounter++;	
+					counter = 0;	
 				}		
-			}	
+			}
 		}	
 	}
-	if (updateCounter != 0) {//this should never happen lmao
-		writeTo(1,"Up to Date\n\0");
-		return 0;	
-	}
-	return 1;//we did it
+	return 0;//we did it
 }
 
 
