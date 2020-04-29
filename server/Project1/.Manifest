@@ -1,1 +1,5 @@
-1
+3
+3 !UT Project1/test3.txt DELETE
+2 !UT Project1/test1.txt 12d77e29e0f240c122020c48a9836330ae1e92201d8b81be67e5f0963e386809
+2 !UT Project1/test2.txt 579f0966f19c1e5a312e367a0530c3d78e930b282c7abb6071a1157fffcb4ec1
+2 !UT Project1/test4.txt DELETE

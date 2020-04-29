@@ -1,4 +1,5 @@
-3
-3 !RM Project1/test1.txt DELETE
-2 !UT Project1/test2.txt da52ff58181b3638de7712926bdc2f87f13fd113d9dc8c6cc969452d576de3c7
-2 !UT Project1/test3.txt DELETE
+2
+2 !UT Project1/test4.txt DELETE
+2 !UT Project1/test2.txt 579f0966f19c1e5a312e367a0530c3d78e930b282c7abb6071a1157fffcb4ec1
+2 !UT Project1/test1.txt 12d77e29e0f240c122020c48a9836330ae1e92201d8b81be67e5f0963e386809
+2 !MD Project1/test3.txt efaa98b0959dafbba5518ee421ca0a219cf6d4ca8fd1fd38631f92c9de17fe7e

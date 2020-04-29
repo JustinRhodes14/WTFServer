@@ -577,6 +577,16 @@ void func(int sockfd)
 			write(sockfd,"Error",5);
 			return;
 		}
+		int manFD = open(combineString(project,"/.Manifest\0"),O_RDONLY);
+		char* manFile = readSock(manFD);
+		char len[256];
+		memset(len,'\0',256);
+		sprintf(len,"%d",strlen(manFile));
+		write(sockfd,len,sizeof(len));	
+		bzero(buff,sizeof(buff));
+		read(sockfd,buff,sizeof(buff));
+		write(sockfd,manFile,strlen(manFile));//send over manifest
+		
 			
 	} else if (compareString(action,"history") == 0) {
 		DIR *d;
@@ -639,7 +649,6 @@ void func(int sockfd)
 		system(com3);
 		free(com3);
 		system("rm -r .temp\0");
-		printf("we made it\n");
 		write(sockfd,"Success",7);
 	}
 }
@@ -678,6 +687,7 @@ void makeDirectories(char* dirs) {
 }
 
 int push(char* message) {
+	printf("message: %s\n",message);
 	message = substring(message,10,-1);//extracts sendfile: portion
 	int end = 0;
 	while (message[end] != ':') {
@@ -690,6 +700,7 @@ int push(char* message) {
 	int fileSize = 0;
 	int fileBytes = 0;
 	int start = end+1;
+	printf("HELLO\n");
 	for (i = end + 1; i < length; i++) {
 		if (message[i] == ':') {
 			if (counter == 0) {
@@ -716,6 +727,7 @@ int push(char* message) {
 		}
 	}
 	
+	printf("HELLO\n");
 	return 1;
 }
 

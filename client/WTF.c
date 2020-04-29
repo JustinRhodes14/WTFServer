@@ -29,6 +29,7 @@ int extractInfo(char*);
 void extractMan(char*);
 void func(int,char*,char*,char*,int);
 void listDirectories(char*);
+char* liveHash(char*);
 void makeDirectories(char*);
 char* readConf(int);
 char* readManifest(int);
@@ -40,6 +41,7 @@ int tableComphash(char*);
 void tableInit(int);
 void tableInsert(char*,char*,char*,char*);
 int tableSearch(char*);
+int update(char*,char*,char*);
 void updateManifest(char*,char*,char*);
 void writeTo(int,char*);
 
@@ -677,7 +679,6 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 			}
 		}
 	
-	
 		char* total = combineString(action," \0");
 		total = combineString(total,projname);
 		write(sockfd,total,strlen(total));
@@ -757,7 +758,7 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 		sysMessage = combineString(sysMessage,dest);
 		system(sysMessage);	
 		listDirectories(projname);
-		
+		printf("strlen: %d\n",strlen(directories));
 		if (strlen(directories) <= 1) {
 			write(sockfd,"empty",5);
 		} else {
@@ -774,6 +775,7 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 	
 		lseek(comFD,0,SEEK_SET);
 		char* sendFile = createCom(comText);
+
 		memset(length,'\0',256);
 		sprintf(length,"%d",strlen(sendFile));
 		write(sockfd,length,sizeof(length));
@@ -813,6 +815,16 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 			printf("Project does not exist on server\n");
 			return;
 		}
+		int length = atoi(buff);
+		char manbuff[length+1];//server manifest
+		memset(manbuff,'\0',length+1);
+		write(sockfd,"Success",7);
+		read(sockfd,manbuff,length);
+		printf("manbuff: %s\n",manbuff);
+		tableInit(100);
+		int clientFD = open(combineString(projname,"/.Manifest\0"),O_RDONLY);
+		char* ver = readManifest(clientFD);
+		int success = update(projname,manbuff,ver);
 			
 	} else if (compareString(action,"history") == 0) {
 		char* total = combineString(action," \0");
@@ -871,6 +883,15 @@ void listDirectories(char* path) {
 		}	
 	}
 	closedir(d);
+}
+
+char* liveHash(char* filePath) {
+	int fd = open(filePath,O_RDONLY);
+	char* fileText = readConf(fd);
+	char* hashedStuff = "";
+	hashedStuff = combineString(hashedStuff,compHash(fileText));
+	close(fd);
+	return hashedStuff;
 }
 
 void makeDirectories(char* dirs) {
@@ -1131,6 +1152,125 @@ int tableSearch(char* filepath) {
 	return -1;	
 }
 
+int update(char* project, char* serverMan, char* clientVer) {
+	int sevLength = strlen(serverMan);
+	printf("hello:%s:hello\n",serverMan);
+	int i = 0;
+	int start = 0;
+	int counter = 0;
+	char* version = "";
+	char* code = "";
+	char* filepath = "";
+	char* shacode = "";
+	int flictFD = 0;
+	int updateCounter = 0;
+	int success = -1;// -1 for fail, 0 for partial, 1 for success
+	bool conflict = false;
+	while (serverMan[i] != '\n' && i < sevLength) {
+		i++;	
+	}
+	start = i+1;
+	char* sversion = substring(serverMan,0,i);
+	if ((i+1) == strlen(serverMan)) {
+		printf("No updates necessary, server manifest is empty\n");
+		return 1;//empty server manifest
+	}
+	start = i+1;
+	if (compareString(sversion,clientVer) == 0) {
+		write(1,"Up to Date\n\0",12);
+		int updFile = open(combineString(project,"/.Update"),O_WRONLY | O_CREAT | O_TRUNC,00600);
+		close(updFile);
+		remove(combineString(project,"/.Conflict"));
+		return 1;//full success
+	} else {
+		int updFile = open(combineString(project,"/.Update"),O_WRONLY | O_CREAT | O_TRUNC, 00600);
+		for (i = i+1; i < sevLength; i++) {
+			if (serverMan[i] == ' ' || serverMan[i] == '\n') {
+				if (counter == 0) {
+					//printf("%s\n",version);
+					version = substring(serverMan,start,i);
+				} else if (counter == 1) {
+					code = substring(serverMan,start,i);
+					//printf("%s\n",version);
+				} else if (counter == 2) {
+					filepath = substring(serverMan,start,i);
+					//printf("%s\n",version);
+				} else if (counter == 3) {
+					shacode = substring(serverMan,start,i);
+					//printf("%s\n",version);
+				}
+				counter++;
+				start = i+1;
+			}
+			if (counter == 4) {
+				//all data stored
+				counter = 0;
+				if (tableSearch(filepath) != -1) {//found
+					char* freshHash = liveHash(filepath);
+					int index = tableComphash(filepath);
+					hashNode* temp = table->table[index];
+					while (temp != NULL) {
+						if (compareString(temp->filepath,filepath) == 0) {
+							break;
+						}	
+						temp = temp->next;
+					}
+					if (compareString(freshHash,temp->shacode) != 0 && compareString(freshHash,shacode) != 0) {
+						if (conflict == false) {
+							flictFD = open(combineString(project,"/.Conflict"),O_WRONLY | O_CREAT | O_TRUNC,00600);
+							remove(combineString(project,"/.Update\0"));
+							conflict = true;
+							printf("conflict created\n");
+						}
+						char* message = combineString(version," \0");
+						message = combineString(message,"!CF \0");
+						message = combineString(message,filepath);
+						message = combineString(message," \0");
+						message = combineString(message,freshHash);
+						message = combineString(message,"\n\0");
+						writeTo(flictFD,message);
+						writeTo(1,message);
+					} else if (compareString(freshHash,temp->shacode) == 0 && compareString(freshHash,shacode) != 0) {
+						char* message = combineString(version," \0");
+						if (compareString(shacode,"DELETE\0") == 0) {
+							message = combineString(message,"!RM\0");
+						} else {
+							message = combineString(message,"!MD\0");
+						}
+						message = combineString(message," \0");
+						message = combineString(message,filepath);
+						message = combineString(message," \0");
+						message = combineString(message,shacode);
+						message = combineString(message,"\n\0");
+						writeTo(updFile,message);
+						writeTo(1,message);
+						updateCounter++;	
+					}
+					
+					
+				} else {
+					char* message = combineString(version," \0");
+					message = combineString(message,code);
+					message = combineString(message," \0");
+					message = combineString(message,filepath);
+					message = combineString(message," \0");
+					message = combineString(message,shacode);
+					message = combineString(message,"\n\0");
+					writeTo(updFile,message);
+					writeTo(1,message);
+					updateCounter++;	
+				}		
+			}	
+		}	
+	}
+	if (updateCounter != 0) {//this should never happen lmao
+		writeTo(1,"Up to Date\n\0");
+		return 0;	
+	}
+	return 1;//we did it
+}
+
+
 void updateManifest(char* commit,char* project,char* num) {
 	//printf("%s\n",commit);
 	int length = strlen(commit);
@@ -1178,7 +1318,7 @@ void updateManifest(char* commit,char* project,char* num) {
 				version += 1;
 				sprintf(newNum,"%d ",version);
 				writeTo(manFD,newNum);
-				writeTo(manFD,code);
+				writeTo(manFD,"!UT\0");
 				writeTo(manFD," \0");
 				writeTo(manFD,filepath);
 				writeTo(manFD," \0");
@@ -1190,7 +1330,7 @@ void updateManifest(char* commit,char* project,char* num) {
 				version += 1;
 				sprintf(newNum,"%d ",version);
 				writeTo(manFD,newNum);
-				writeTo(manFD,code);
+				writeTo(manFD,"!UT\0");
 				writeTo(manFD," \0");
 				writeTo(manFD,filepath);
 				writeTo(manFD," \0");
