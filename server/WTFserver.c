@@ -29,6 +29,7 @@ void makeDirectories(char*);
 char* readManifest(int);
 char* readSock(int); 
 void stopSig(int);
+char* sendFile(char*);
 char* substring(char*,int,int);
 int tableComphash(char*);
 void tableFree(int);
@@ -603,6 +604,63 @@ void func(int sockfd)
 		write(sockfd,manFile,strlen(manFile));//send over manifest
 		
 			
+	} else if (compareString(action,"upgrade") == 0) {
+		DIR *d;
+		struct dirent dir;
+		if (!(d = opendir(project))) {
+			printf("%s does not exist on server\n",project);
+			write(sockfd,"Error",5);
+			return;
+		}
+		write(sockfd,"Success",7);
+		bzero(buff,sizeof(buff));
+		read(sockfd,buff,sizeof(buff));
+		int len = atoi(buff);
+		write(sockfd,"Success",7);
+		char fileBuff[len+1];
+		memset(fileBuff,'\0',len+1);
+		read(sockfd,fileBuff,len);
+		write(sockfd,"Succes",7);
+		//printf("files: %s\n",fileBuff);
+		char* toSend = sendFile(fileBuff);
+		//printf("toSend: %s\n",toSend);
+		char num[256];
+		memset(num,'\0',256);
+		sprintf(num,"%d",strlen(toSend));
+		write(sockfd,num,sizeof(num));
+		bzero(buff,sizeof(buff));
+		read(sockfd,buff,sizeof(buff));
+		write(sockfd,toSend,strlen(toSend));//sent over sendfile
+
+
+		listDirectories(project);
+		if (strlen(directories) <= 1) {
+			write(sockfd,"empty",5);
+		} else {
+			bzero(buff,sizeof(buff));
+			sprintf(buff,"%d",strlen(directories));
+			write(sockfd,buff,sizeof(buff));
+			bzero(buff,sizeof(buff));
+			read(sockfd,buff,sizeof(buff));
+			write(sockfd,directories,strlen(directories));
+			directories = "";
+		}
+		bzero(buff,sizeof(buff));
+		read(sockfd,buff,sizeof(buff));
+		//send manifest	
+		int updatedMan = open(combineString(project,"/.Manifest\0"),O_RDONLY);
+		char* manText = readSock(updatedMan);
+		//printf("%s\n",manText);
+		bzero(buff,sizeof(buff));
+		memset(num,'\0',256);
+		sprintf(num,"%d",strlen(manText));
+		//printf("buff: %s\n",num);
+		write(sockfd,num,256);
+		bzero(buff,sizeof(buff));
+		read(sockfd,buff,sizeof(buff));
+		write(sockfd,manText,strlen(manText));
+		close(updatedMan);	
+		
 	} else if (compareString(action,"history") == 0) {
 		DIR *d;
 		struct dirent dir;
@@ -816,6 +874,35 @@ char* readSock(int sockFD) {
 		confInfo = combineString(confInfo,buffer);
 	}
 	return confInfo;
+}
+
+char* sendFile(char* files) {
+	char* ret = "sendfile:\0";
+	int length = strlen(files);
+	int i;
+	int start = 0;
+	for (i = 0; i < length; i++) {
+		if (files[i] == ' ') {
+			char* filename = substring(files,start,i);
+			int nameLength = strlen(filename);
+			int fd = open(filename,O_RDONLY);
+			char* bytes = readSock(fd);
+			int byteLength = strlen(bytes);
+			char num[256];
+			memset(num,'\0',256);
+			sprintf(num,"%d:",nameLength);
+			ret = combineString(ret,num);
+			memset(num,'\0',256);
+			sprintf(num,"%d:",byteLength);
+			ret = combineString(ret,num);
+			ret = combineString(ret,filename);
+			ret = combineString(ret,bytes);
+			close(fd);
+			free(filename);
+			free(bytes);
+		}
+	}
+	return ret;
 }
 
 char* substring(char* str, int start, int end) {

@@ -43,6 +43,8 @@ void tableInsert(char*,char*,char*,char*);
 int tableSearch(char*);
 int update(char*,char*,char*);
 void updateManifest(char*,char*,char*);
+char* upgrade(char*,int);
+int upgradeParse(char*);
 void writeTo(int,char*);
 
 typedef unsigned char byte;
@@ -780,8 +782,7 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 	
 		lseek(comFD,0,SEEK_SET);
 		char* sendFile = createCom(comText);
-		printf("sendfile: %s",sendFile);
-		printf("Hello\n");
+		//printf("sendfile: %s",sendFile);
 		memset(length,'\0',256);
 		sprintf(length,"%d",strlen(sendFile));
 		write(sockfd,length,sizeof(length));
@@ -838,6 +839,102 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 		}
 		return;
 			
+	} else if (compareString(action,"upgrade") == 0) {
+		DIR *d;
+		struct dirent dir;
+		if (!(d = opendir(projname))) {
+			printf("%s does not exist on client\n",projname);
+			write(sockfd,"Error",5);
+			return;
+		} 
+		int flictFD = open(combineString(projname,"/.Conflict"),O_RDONLY);
+		if (flictFD != -1) {
+			printf("Resolve conflicts first and then update again\n");
+			write(sockfd,"Error",5);
+			close(flictFD);
+			return;
+		}
+		close(flictFD);
+		int updFile = open(combineString(projname,"/.Update"),O_RDONLY);
+		if (updFile == -1) {
+			printf("Call update first then upgrade\n");
+			write(sockfd,"Error",5);
+			close(updFile);
+			return;
+		}
+		char* total = combineString(action," \0");
+		total = combineString(total,projname);
+		write(sockfd,total,strlen(total));
+		bzero(buff,sizeof(buff));
+		read(sockfd,buff,sizeof(buff));
+		if (compareString(buff,"Error\0") == 0) {
+			printf("Project does not exist on server\n");
+			return;
+		}
+		char* toUpgrade = upgrade(projname,updFile);
+		bzero(buff,sizeof(buff));
+		sprintf(buff,"%d",strlen(toUpgrade));
+		write(sockfd,buff,sizeof(buff));
+		bzero(buff,sizeof(buff));
+		read(sockfd,buff,sizeof(buff));
+		
+		write(sockfd,toUpgrade,strlen(toUpgrade));
+		bzero(buff,sizeof(buff));
+		read(sockfd,buff,sizeof(buff));
+		bzero(buff,sizeof(buff));
+		
+		read(sockfd,buff,sizeof(buff));
+		int len = atoi(buff);
+		write(sockfd,"Success",7);
+		char sendFile[len + 1];
+		memset(sendFile,'\0',len+1);
+		read(sockfd,sendFile,len);//sendfile acquireda
+		
+		bzero(buff,sizeof(buff));
+		read(sockfd,buff,sizeof(buff));
+		
+		if (compareString(buff,"empty") != 0) {
+			int dirlen = atoi(buff);
+			char dirbuff[dirlen+1];
+			memset(dirbuff,'\0',dirlen+1);
+			write(sockfd,"Success",7);
+			read(sockfd,dirbuff,dirlen);
+			makeDirectories(dirbuff);
+		}
+		write(sockfd,"Success",7);
+		//supposed to be sendFile
+		//char* dummyMessage = "sendfile:7:46:Test/t3hi there ima be modified iwdaojwioajdwaadwioj\n12:19:Test/testqwei got your message\n";
+		int upgSuccess = upgradeParse(sendFile);
+		
+		bzero(buff,sizeof(buff));
+		read(sockfd,buff,sizeof(buff));
+		int newMan = atoi(buff);
+		//printf("newMan: %d\n",newMan);
+		write(sockfd,"Success",7);
+		char manBuff[newMan+1];
+		memset(manBuff,'\0',newMan+1);
+		read(sockfd,manBuff,newMan);
+		int nmanFD = open(combineString(projname,"/.Manifest\0"),O_WRONLY | O_CREAT | O_TRUNC,00600);
+		writeTo(nmanFD,manBuff);
+		close(newMan);
+		//printf("new man: %s\n",manBuff);
+
+		printf("Successfuly upgrade\n");
+		
+		//printf("SENDFILE: %s\n",sendFile);
+		/*
+		int len = atoi(buff);
+		
+		write(sockfd,"Success",7);
+		char fileStuff[len + 1];
+		memeset(fileStuff,'\0',len+1);
+		read(sockfd,fileStuff,len);
+		printf("fileStuff: %s\n",fileStuff);
+		*/
+		//printf("toUpgrade: %s\n",toUpgrade);
+		
+	
+		
 	} else if (compareString(action,"history") == 0) {
 		char* total = combineString(action," \0");
 		total = combineString(total,projname);
@@ -1366,6 +1463,89 @@ void updateManifest(char* commit,char* project,char* num) {
 			temp2 = temp2->next;
 		}	
 	}
+}
+
+char* upgrade(char* project,int updateFD) {
+	char* ret = "";
+	int t = lseek(updateFD,0,SEEK_END);
+	char* updfile = combineString(project,"/.Update\0");
+	if (t <= 1) {
+		ret = combineString(ret,"Up to date\n");
+		//printf("EMPTY REMOVE THING\n");
+		remove(updfile);
+		return ret;	
+	}
+	lseek(updateFD,0,SEEK_SET);
+	char* updText = readConf(updateFD);
+	//printf("updText: %s\n",updText);
+	int i;
+	int counter = 0;
+	int start = 0;
+	char* version = "";
+	char* code = "";
+	char* filepath = "";
+	char* shacode = "";
+	for (i = 0; i < strlen(updText); i++) {
+		if (updText[i] == ' ') {
+			if (counter == 0) {
+				version = substring(updText,start,i);
+			} else if (counter == 1) {
+				code = substring(updText,start,i);
+			} else if (counter == 2) {
+				filepath = substring(updText,start,i);
+			}
+			//printf("WORD: %s\n",substring(updText,start,i));
+			counter++;
+			start = i+1;
+		} else if (updText[i] == '\n' && counter == 3) {
+			shacode = substring(updText,start,i);
+			//printf("SHACODE: %s\n",shacode);
+			start = i+1;
+			counter = 0;
+			if (compareString(code,"!RM\0") == 0) {
+				//printf("REMOVE PLACE HOLDER\n");
+				remove(filepath);	
+			} else if (compareString(code,"!AD\0") == 0 || compareString(code,"!MD\0") == 0) {
+				ret = combineString(ret,filepath);
+				ret = combineString(ret," \0");
+			}
+		}	
+	}
+	//printf("REMOVE UPDATE FILE HERE\n");
+	remove(updfile);
+	return ret;
+}
+
+int upgradeParse(char* sendFile) {
+	sendFile = substring(sendFile,9,-1);
+	int length = strlen(sendFile);
+	int i;
+	int start = 0;
+	int counter = 0;
+	int nameLen = 0;
+	int byteLen = 0;
+	for ( i = 0; i < length; i++) {
+		if (sendFile[i] == ':')	{
+			if (counter == 0) {
+				nameLen = atoi(substring(sendFile,start,i));
+			} else if (counter == 1) {
+				byteLen = atoi(substring(sendFile,start,i));
+			}
+			counter++;
+			start = i+1;	
+		} else if (sendFile[i] != ':' && counter == 2) {
+			char* fName = substring(sendFile,start,start+nameLen);
+			char* fBytes = substring(sendFile,(start+nameLen),(start+nameLen+byteLen));
+			counter = 0;
+			start = start + nameLen+byteLen;
+			i = start;
+			int fd = open(fName,O_WRONLY | O_CREAT | O_TRUNC,00600);
+			writeTo(fd,fBytes);
+			close(fd);
+			//printf("fName: %s, fBytes: %s\n",fName,fBytes);
+		}
+	}
+	return 1;
 }
 
 void writeTo(int fd, char* word) {
