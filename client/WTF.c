@@ -720,7 +720,8 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 		char* comFile = combineString(projname,"/.Commit\0");
 		int comFD = open(comFile,O_RDONLY);
 		if (comFD == -1) {
-			printf("No .Commit present for %s or project doesn't exist on client, commit before you push\n");
+			printf("No .Commit present for %s or project doesn't exist on client, commit before you push\n",projname);
+			write(sockfd,"Error",5);
 			return;
 		}
 		char* total = combineString(action," \0");
@@ -748,19 +749,21 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 			close(comFD);
 			return;
 		}
-		
+		/*
 		char* sysMessage = combineString("rsync -Rr \0",projname);
 		char* dest = combineString(projname,"/.History/\0");
-		tableInit(100);
-		int manFD = open(combineString(projname,"/.Manifest\0"),O_RDONLY);
-		char* num = readManifest(manFD);
 		dest = combineString(dest,num);
 		mkdir(dest,0700);
 		sysMessage = combineString(sysMessage," \0");
 		sysMessage = combineString(sysMessage,dest);
 		system(sysMessage);	
+		*/
+		tableInit(100);
+		int manFD = open(combineString(projname,"/.Manifest\0"),O_RDONLY);
+		char* num = readManifest(manFD);
 		listDirectories(projname);
-		printf("strlen: %d\n",strlen(directories));
+		close(manFD);
+		//printf("strlen: %d\n",strlen(directories));
 		if (strlen(directories) <= 1) {
 			write(sockfd,"empty",5);
 		} else {
@@ -777,7 +780,8 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 	
 		lseek(comFD,0,SEEK_SET);
 		char* sendFile = createCom(comText);
-
+		printf("sendfile: %s",sendFile);
+		printf("Hello\n");
 		memset(length,'\0',256);
 		sprintf(length,"%d",strlen(sendFile));
 		write(sockfd,length,sizeof(length));
@@ -1282,6 +1286,9 @@ void updateManifest(char* commit,char* project,char* num) {
 	int length = strlen(commit);
 	int mVers = atoi(num) + 1;
 	char newNum[256];
+	char finalVer[256];
+	memset(finalVer,'\0',256);
+	sprintf(finalVer,"%d ",mVers);
 	memset(newNum,'\0',256);
 	sprintf(newNum,"%d\n",mVers);
 	char* manFile = combineString(project,"/.Manifest\0");
@@ -1320,10 +1327,7 @@ void updateManifest(char* commit,char* project,char* num) {
 				temp = temp->next;
 			}
 			if (compareString(code,"!AD\0") == 0 || compareString(code,"!MD\0") == 0) {
-				memset(newNum,'\0',256);
-				version += 1;
-				sprintf(newNum,"%d ",version);
-				writeTo(manFD,newNum);
+				writeTo(manFD,finalVer);
 				writeTo(manFD,"!UT\0");
 				writeTo(manFD," \0");
 				writeTo(manFD,filepath);
@@ -1332,10 +1336,7 @@ void updateManifest(char* commit,char* project,char* num) {
 				writeTo(manFD,"\n\0");
 			}
 			if (compareString(code,"!RM\0") == 0) {
-				memset(newNum,'\0',256);
-				version += 1;
-				sprintf(newNum,"%d ",version);
-				writeTo(manFD,newNum);
+				writeTo(manFD,finalVer);
 				writeTo(manFD,"!UT\0");
 				writeTo(manFD," \0");
 				writeTo(manFD,filepath);

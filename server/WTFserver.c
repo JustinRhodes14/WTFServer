@@ -259,10 +259,12 @@ char* currver(int manFD) {
 	for (i = 0; i < table->size; i++) {
 		hashNode* temp = table->table[i];
 		while (temp) {
-			result = combineString(result,temp->version);
-			result = combineString(result," \0");
-			result = combineString(result,temp->filepath);
-			result = combineString(result,"\n\0");
+			if (compareString(temp->shacode,"DELETE\0") != 0) {
+				result = combineString(result,temp->version);
+				result = combineString(result," \0");
+				result = combineString(result,temp->filepath);
+				result = combineString(result,"\n\0");
+			}
 			temp = temp->next;
 		}
 	}
@@ -335,7 +337,6 @@ void func(int sockfd)
 { 
 	char buff[256];
 	bzero(buff,256);
-
 	read(sockfd,buff,sizeof(buff));
 	if (compareString(buff,"Error\0") == 0) {
 		printf("Error on client side, going back to accept...\n");
@@ -437,6 +438,8 @@ void func(int sockfd)
 			lseek(manFD,0,SEEK_SET);
 			//close(manFD);
 			char* toWrite = currver(manFD);
+			num = combineString(num,"\n\0");
+			toWrite = combineString(num,toWrite);
 			close(manFD);
 			char length[256];
 			memset(length,'\0',256);
@@ -639,7 +642,7 @@ void func(int sockfd)
 		int manFD = open(man,O_RDONLY);
 		char* num = readManifest(manFD);
 		tableFree(100);
-		if (compareString(num,version) <= 0) {
+		if (compareString(num,version) <= 0 || atoi(version) <= 0) {
 			printf("Can't rollback, versions are the same or requested version is greater than current\n");
 			write(sockfd,"Error",5);
 			return;
@@ -663,6 +666,7 @@ void func(int sockfd)
 		system("rm -r .temp\0");
 		write(sockfd,"Success",7);
 	}
+	return;
 }
 
 void listDirectories(char* path) {
@@ -699,7 +703,6 @@ void makeDirectories(char* dirs) {
 }
 
 int push(char* message) {
-	printf("message: %s\n",message);
 	message = substring(message,10,-1);//extracts sendfile: portion
 	int end = 0;
 	while (message[end] != ':') {
@@ -712,7 +715,6 @@ int push(char* message) {
 	int fileSize = 0;
 	int fileBytes = 0;
 	int start = end+1;
-	printf("HELLO\n");
 	for (i = end + 1; i < length; i++) {
 		if (message[i] == ':') {
 			if (counter == 0) {
@@ -739,7 +741,6 @@ int push(char* message) {
 		}
 	}
 	
-	printf("HELLO\n");
 	return 1;
 }
 
