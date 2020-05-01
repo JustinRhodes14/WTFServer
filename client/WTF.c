@@ -1364,28 +1364,33 @@ int update(char* project, char* serverMan, char* clientVer) {
 							return 2;
 						}
 						char* message = combineString(version," \0");
+						char* stdMes = combineString("C \0",filepath);
 						message = combineString(message,"!CF \0");
 						message = combineString(message,filepath);
 						message = combineString(message," \0");
 						message = combineString(message,freshHash);
 						message = combineString(message,"\n\0");
 						writeTo(flictFD,message);
-						writeTo(1,message);
+						writeTo(1,stdMes);
 						counter = 0;
 					} else if (compareString(freshHash,temp->shacode) == 0 && compareString(freshHash,shacode) != 0) {
 						char* message = combineString(version," \0");
+						char* stdMes = "";
 						if (compareString(shacode,"DELETE\0") == 0) {
 							message = combineString(message,"!RM\0");
+							stdMes = combineString(stdMes,"D \0");
 						} else {
 							message = combineString(message,"!MD\0");
+							stdMes = combineString(stdMes,"M \0");
 						}
 						message = combineString(message," \0");
 						message = combineString(message,filepath);
 						message = combineString(message," \0");
 						message = combineString(message,shacode);
 						message = combineString(message,"\n\0");
+						stdMes = combineString(stdMes,filepath);
 						writeTo(updFile,message);
-						writeTo(1,message);
+						writeTo(1,stdMes);
 						updateCounter++;
 						counter = 0;	
 					}
@@ -1393,6 +1398,7 @@ int update(char* project, char* serverMan, char* clientVer) {
 					
 				} else {
 					char* message = combineString(version," \0");
+					char* stdMes = combineString("A \0",filepath);
 					message = combineString(message,code);
 					message = combineString(message," \0");
 					message = combineString(message,filepath);
@@ -1400,7 +1406,7 @@ int update(char* project, char* serverMan, char* clientVer) {
 					message = combineString(message,shacode);
 					message = combineString(message,"\n\0");
 					writeTo(updFile,message);
-					writeTo(1,message);
+					writeTo(1,stdMes);
 					updateCounter++;	
 					counter = 0;	
 				}		

@@ -24,7 +24,7 @@ char* currverr(int);
 void destroy(char*);
 void extractMan(char*);
 int extractInfo(char*); 
-void freeLL();
+void freeLL(char*);
 void* func(void*);
 int joinThreads(pthread_t[],int);
 void listDirectories(char*);
@@ -96,8 +96,11 @@ int main(int argc, char** argv)
 		printf("Fatal Error: Only input one argument (one port number)\n");
 		exit(0);
 	}
-
-
+	commits = (comNode*)malloc(sizeof(comNode));
+	commits->commit = "DUMMYDONTDELETE\0";
+	commits->projname = "DUMMYDONTDELETE\0";
+	commits->next = NULL;
+	
 	int port = atoi(argv[1]);
 	struct sockaddr_in servaddr, cli; 
 
@@ -276,6 +279,7 @@ int create(char* projectName) {
 		close(manFD);
 		free(histFile);
 		free(manFile);
+		free(opsFile);
 		printf("Successfully created %s project on server\n",projectName);
 		return 1;
 	} else {
@@ -355,11 +359,15 @@ int extractInfo(char* word) {
 	return counter;
 }
 
-void freeLL(int type) {//need to do this for specific project commits, 1 for commits, 2 for mutexes
+void freeLL(char* project) {//need to do this for specific project commits, 1 for commits, 2 for mutexes
 	while(commits != NULL) {
-		comNode* temp = commits;
-		commits = commits->next;
-		free(temp);
+		if (compareString(commits->projname,project) == 0) {
+			comNode* temp = commits;
+			commits = commits->next;
+			free(temp);
+		} else {
+			commits = commits->next;
+		}
 	}
 }
 
@@ -387,20 +395,6 @@ void* func(void* connfd)
 		int result = create(project);
 		if (result == 1) {
 			resultMessage = combineString(resultMessage, "Successfully initalized project on server and client\n");
-			if (projLocks == NULL) {
-				mutexNode* temp = (mutexNode*)malloc(sizeof(mutexNode));
-				temp->project = project;
-				temp->next = NULL;
-				pthread_mutex_init(&temp->projLock,NULL);
-				projLocks = temp;
-			} else {
-				mutexNode* temp = (mutexNode*)malloc(sizeof(mutexNode));
-				temp->project = project;
-				temp->next = projLocks->next;
-				pthread_mutex_init(&temp->projLock,NULL);
-				projLocks->next = temp;	
-				printf("%s\n",projLocks->next->project);
-			}
 			pthread_mutex_unlock(&repoLock);
 			write(sockfd,resultMessage,strlen(resultMessage));
 		} else {
@@ -647,7 +641,7 @@ void* func(void* connfd)
 				char fileBuf[lenFiles+1];	
 				memset(fileBuf,'\0',lenFiles+1);
 				read(sockfd,fileBuf,lenFiles);
-				printf("%d\n",push(fileBuf));
+				push(fileBuf);
 				tableFree(100);
 				close(manFD);
 				
@@ -668,6 +662,7 @@ void* func(void* connfd)
 				writeTo(opsFD,comBuf);
 				printf("Successful push\n");
 				//just gotta free LL for this now
+				freeLL(project);
 			} else {
 				write(sockfd,"No commits matched, commit before you push\n",43);
 			}
