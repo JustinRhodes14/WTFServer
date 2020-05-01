@@ -14,6 +14,7 @@
 #include <unistd.h>
 #include <stdbool.h>
 #define SA struct sockaddr 
+void printCommits();
 char* combineString(char*,char*);
 int compareString(char*,char*);
 char* copyString(char*,char*);
@@ -25,6 +26,7 @@ void extractMan(char*);
 int extractInfo(char*); 
 void freeLL();
 void* func(void*);
+int joinThreads(pthread_t[],int);
 void listDirectories(char*);
 void makeDirectories(char*);
 char* readManifest(int);
@@ -142,16 +144,28 @@ int main(int argc, char** argv)
 	//also make a signal handler to stop the server
 	// Function for chatting between client and server 
 	pthread_mutex_init(&repoLock,NULL);
-	pthread_t threads[80];
+	pthread_t threads[20];
 	int i = 0;
 	while (!(connfd < 0)) {
 		pthread_create(&threads[i],NULL,func,(void*)&connfd);		
 		//func(connfd); 
 		connfd = accept(sockfd,(SA*)&cli,&len);
+		if (i >= 10) {
+			i = 0; 
+			joinThreads(threads,i);
+		}
 		i++;
 	}
 	// After chatting close the socket 
 	close(sockfd);
+}
+
+int joinThreads(pthread_t threads[],int i) {
+	int k;
+	for (k = 0; k < i; k++) {
+		pthread_join(threads[k],NULL);	
+	}
+	return 0;
 }
 
 char* checkout() {
@@ -358,7 +372,7 @@ void* func(void* connfd)
 	read(sockfd,buff,sizeof(buff));
 	if (compareString(buff,"Error\0") == 0) {
 		printf("Error on client side, going back to accept...\n");
-		return;	
+		pthread_exit(NULL);
 	}
 	int split = extractInfo(buff);
 
@@ -366,7 +380,10 @@ void* func(void* connfd)
 	char* action = substring(buff,0,split);
 	char* project = substring(buff,split+1,-1);
 	if (compareString("create\0",action) == 0) {
-		pthread_mutex_lock(&repoLock);
+		if (pthread_mutex_trylock(&repoLock) != 0) {
+			write(sockfd,"locked",6);
+			pthread_exit(NULL);
+		}
 		int result = create(project);
 		if (result == 1) {
 			resultMessage = combineString(resultMessage, "Successfully initalized project on server and client\n");
@@ -375,12 +392,14 @@ void* func(void* connfd)
 				temp->project = project;
 				temp->next = NULL;
 				pthread_mutex_init(&temp->projLock,NULL);
+				projLocks = temp;
 			} else {
 				mutexNode* temp = (mutexNode*)malloc(sizeof(mutexNode));
 				temp->project = project;
 				temp->next = projLocks->next;
 				pthread_mutex_init(&temp->projLock,NULL);
 				projLocks->next = temp;	
+				printf("%s\n",projLocks->next->project);
 			}
 			pthread_mutex_unlock(&repoLock);
 			write(sockfd,resultMessage,strlen(resultMessage));
@@ -389,12 +408,19 @@ void* func(void* connfd)
 			pthread_mutex_unlock(&repoLock);
 			write(sockfd,resultMessage,strlen(resultMessage));
 		}	
+		pthread_mutex_unlock(&repoLock);
+		pthread_exit(NULL);
 	} else if (compareString("destroy", action) == 0) {
+		if (pthread_mutex_trylock(&repoLock) != 0) {
+			write(sockfd,"locked",6);
+			pthread_exit(NULL);
+		}
 		project = combineString("./", project);
 		DIR* d;
 		struct dirent* dir;
 		if(!(d = opendir(project))) {
 			resultMessage = combineString(resultMessage, "Destroy failed. Project does not exist on server\n");
+			pthread_mutex_unlock(&repoLock);
 			write(sockfd,resultMessage,strlen(resultMessage));
 			closedir(d);
 		} else {
@@ -402,10 +428,17 @@ void* func(void* connfd)
 			destroy(project);	
 			rmdir(project);
 			resultMessage = combineString(resultMessage, "Successfully destroyed project.\n");
+			pthread_mutex_unlock(&repoLock);
 			write(sockfd,resultMessage,strlen(resultMessage));
 			printf("Successfully destroyed %s\n", project);
 		}
+		pthread_mutex_unlock(&repoLock);
+		pthread_exit(NULL);
 	} else if (compareString("checkout",action) == 0) {
+		if (pthread_mutex_trylock(&repoLock) != 0) {
+			write(sockfd,"locked",6);
+			pthread_exit(NULL);
+		}
 		DIR* d;
 		struct dirent* dir;
 		if(!(d = opendir(project))) {
@@ -455,7 +488,13 @@ void* func(void* connfd)
 			tableFree(100);
 			printf("Successfully cloned project into client.\n");
 		}
+		pthread_mutex_unlock(&repoLock);
+		pthread_exit(NULL);
 	} else if (compareString("currentversion",action) == 0) {
+		if (pthread_mutex_trylock(&repoLock) != 0) {
+			write(sockfd,"locked",6);
+			pthread_exit(NULL);
+		}
 		DIR* d;
 		struct dirent* dir;
 		if(!(d = opendir(project))) {
@@ -487,13 +526,20 @@ void* func(void* connfd)
 			printf("Successfully returned currentversion to client\n");
 			tableFree(100);
 		}
+		pthread_mutex_unlock(&repoLock);
+		pthread_exit(NULL);
 	} else if (compareString("commit",action) == 0) {
+		if (pthread_mutex_trylock(&repoLock) != 0) {
+			write(sockfd,"locked",6);
+			pthread_exit(NULL);
+		}
 		DIR *d;
 		struct dirent *dir;
 		if (!(d = opendir(project))) {
 			printf("%s does not exist on server\n",project);
 			write(sockfd,"Error",5);
-			return;
+			pthread_mutex_unlock(&repoLock);
+			pthread_exit(NULL);
 		}
 		char* manFile = combineString(project,"/.Manifest\0");
 		int manFD = open(manFile,O_RDONLY);
@@ -512,7 +558,7 @@ void* func(void* connfd)
 		char comBuf[length+1];
 		bzero(comBuf,sizeof(comBuf));
 		read(sockfd,comBuf,length);
-		printf("Successfully recieved .Commit file\n");
+		printf("Successfully recieved .Commit file\n",comBuf);
 		char* comFile = combineString(project,"/.Commit\0");
 		//int mitFD = open(comFile,O_WRONLY | O_CREAT | O_TRUNC,00600);
 		//writeTo(mitFD,comBuf);
@@ -525,21 +571,29 @@ void* func(void* connfd)
 		} else {
 			comNode* temp = (comNode*)malloc(sizeof(comNode));
 			temp->commit = comBuf;
-			temp ->next = commits;
+			temp ->next = commits->next;
 			temp->projname = project;
-			commits = temp;	
+			commits->next = temp;	
 			//printf("Commit: %s\n",commits->commit);
 		}
+		//printCommits();
 		close(manFD);
+		pthread_mutex_unlock(&repoLock);
+		pthread_exit(NULL);
 	} else if (compareString("push",action) == 0) {
+		if (pthread_mutex_trylock(&repoLock) != 0) {
+			write(sockfd,"locked",6);
+			pthread_exit(NULL);
+		}
 		DIR *d;
 		struct dirent* dir;
 		if (!(d = opendir(project))) {
 			resultMessage = combineString(resultMessage, "Project does not exist on server\n");
 			printf("Project does not exist on server, sending error message...\n");
 			write(sockfd,resultMessage,strlen(resultMessage));
-			closedir(d);	
-			return;
+			closedir(d);
+			pthread_mutex_unlock(&repoLock);	
+			pthread_exit(NULL);
 		}
 		write(sockfd,"Success",7);
 		bzero(buff,sizeof(buff));
@@ -554,11 +608,13 @@ void* func(void* connfd)
 		if (commits == NULL) {
 			printf("No commits present, sending error to server\n");
 			write(sockfd,"No commits present, commit before you push\n",43);
-			return;
+			pthread_mutex_unlock(&repoLock);
+			pthread_exit(NULL);
 		} else {
+			//printCommits();
 			int success = traverseCommits(comBuf,project);
 			if (success == 1) {
-				char* sysMessage = combineString("rsync -Rr \0",project);
+				char* sysMessage = combineString("rsync -Rr --exclude '.History' \0",project);
 				char* dest = combineString(project,"/.History/\0");
 				tableInit(100);
 				int manFD = open(combineString(project,"/.Manifest\0"),O_RDONLY);
@@ -616,14 +672,20 @@ void* func(void* connfd)
 				write(sockfd,"No commits matched, commit before you push\n",43);
 			}
 		}
-			
+		pthread_mutex_unlock(&repoLock);
+		pthread_exit(NULL);
 	} else if (compareString(action,"update") == 0) {
+		if (pthread_mutex_trylock(&repoLock) != 0) {
+			write(sockfd,"locked",6);
+			pthread_exit(NULL);	
+		}
 		DIR *d;
 		struct dirent dir;
 		if (!(d = opendir(project))) {
 			printf("%s does not exist on server\n",project);
 			write(sockfd,"Error",5);
-			return;
+			pthread_mutex_unlock(&repoLock);
+			pthread_exit(NULL);
 		}
 		int manFD = open(combineString(project,"/.Manifest\0"),O_RDONLY);
 		char* manFile = readSock(manFD);
@@ -634,15 +696,21 @@ void* func(void* connfd)
 		bzero(buff,sizeof(buff));
 		read(sockfd,buff,sizeof(buff));
 		write(sockfd,manFile,strlen(manFile));//send over manifest
-		
+		pthread_mutex_unlock(&repoLock);
+		pthread_exit(NULL);
 			
 	} else if (compareString(action,"upgrade") == 0) {
+		if (pthread_mutex_trylock(&repoLock) != 0) {
+			write(sockfd,"locked",6);
+			pthread_exit(NULL);
+		}
 		DIR *d;
 		struct dirent dir;
 		if (!(d = opendir(project))) {
 			printf("%s does not exist on server\n",project);
 			write(sockfd,"Error",5);
-			return;
+			pthread_mutex_unlock(&repoLock);
+			pthread_exit(NULL);
 		}
 		write(sockfd,"Success",7);
 		bzero(buff,sizeof(buff));
@@ -692,14 +760,20 @@ void* func(void* connfd)
 		read(sockfd,buff,sizeof(buff));
 		write(sockfd,manText,strlen(manText));
 		close(updatedMan);	
-		
+		pthread_mutex_unlock(&repoLock);
+		pthread_exit(NULL);
 	} else if (compareString(action,"history") == 0) {
+		if (pthread_mutex_trylock(&repoLock) != 0) {
+			write(sockfd,"locked",6);
+			pthread_exit(NULL);
+		}
 		DIR *d;
 		struct dirent dir;
 		if (!(d = opendir(project))) {
 			printf("%s does not exist on server\n",project);
 			write(sockfd,"Error",5);
-			return;
+			pthread_mutex_unlock(&repoLock);
+			pthread_exit(NULL);
 		}
 		char* ops = combineString(project,"/.Operations");
 		int opsFD = open(ops,O_RDONLY);
@@ -708,7 +782,8 @@ void* func(void* connfd)
 		memset(len,'\0',256);
 		if (strlen(opsText) <= 1) {
 			write(sockfd,"Empty",5);
-			return;
+			pthread_mutex_unlock(&repoLock);
+			pthread_exit(NULL);
 		}
 		sprintf(len,"%d",strlen(opsText));
 		write(sockfd,len,sizeof(len));
@@ -716,7 +791,13 @@ void* func(void* connfd)
 		read(sockfd,buff,sizeof(buff));
 		write(sockfd,opsText,strlen(opsText));
 		printf("Successfully returned history to client\n");
+		pthread_mutex_unlock(&repoLock);
+		pthread_exit(NULL);
 	} else if (compareString(action,"rollback") == 0) {
+		if (pthread_mutex_trylock(&repoLock) != 0) {
+			write(sockfd,"locked",6);
+			pthread_exit(NULL);
+		}
 		int split2 = extractInfo(project);
 		char* version = substring(project,split2 + 1,-1);
 		project = substring(project,0,split2);
@@ -725,7 +806,8 @@ void* func(void* connfd)
 		if (!(d = opendir(project))) {
 			printf("%s does not exist on server\n",project);
 			write(sockfd,"Error",5);
-			return;
+			pthread_mutex_unlock(&repoLock);
+			pthread_exit(NULL);
 		}
 		char* man = combineString(project,"/.Manifest");
 		tableInit(100);
@@ -735,16 +817,22 @@ void* func(void* connfd)
 		if (compareString(num,version) <= 0 || atoi(version) <= 0) {
 			printf("Can't rollback, versions are the same or requested version is greater than current\n");
 			write(sockfd,"Error",5);
-			return;
+			pthread_mutex_unlock(&repoLock);
+			pthread_exit(NULL);
 		}
 		system("mkdir .temp\0");
 		char* rolled = combineString(project,"/.History/\0");
+		char* histThing = combineString(project,"/.History\0");
 		rolled = combineString(rolled,version);
 		rolled = combineString(rolled,"/\0");
 		rolled = combineString(rolled,project);
 		char* com1 = combineString("cp -avr \0",rolled);
+		char* otherCom = combineString("cp -avr \0",histThing);
+		otherCom = combineString(otherCom," .temp\0");
 		com1 = combineString(com1," .temp\0");
 		system(com1);
+		system(otherCom);
+		free(otherCom);
 		free(com1);
 		char* com2 = combineString("rm -r \0",project);
 		system(com2);
@@ -755,6 +843,8 @@ void* func(void* connfd)
 		free(com3);
 		system("rm -r .temp\0");
 		write(sockfd,"Success",7);
+		pthread_mutex_unlock(&repoLock);
+		pthread_exit(NULL);
 	}
 	pthread_exit(NULL);
 }
@@ -1036,6 +1126,15 @@ int tableSearch(char* filepath) {
 		temp2 = temp2->next;
 	}
 	return -1;	
+}
+
+void printCommits() {
+	comNode* ptr = commits;
+	while (ptr) {
+		printf("%s: %s\n",ptr->projname,ptr->commit);
+		ptr = ptr->next;
+	}
+	printf("DONE\n");
 }
 
 int traverseCommits(char* commit, char* project) {

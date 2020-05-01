@@ -571,9 +571,14 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 		read(sockfd,buff,sizeof(buff));
 		if (compareString(buff,"Project already exists on server\n\0") == 0) {
 			printf("Project already exists on server, need to clone the project or pick a new name\n");
+			return;
+		} else if (compareString(buff,"locked") == 0) {
+			printf("Connection failed, try again\n");
+			return;
 		} else {
 			int cr = create(projname);
 			printf("%s",buff);
+			return;
 		}
 	} else if (compareString("destroy", action) == 0) {
 		char* total = combineString(action," \0");
@@ -582,9 +587,12 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 		read(sockfd,buff,sizeof(buff));
 		if (compareString(buff,"Destroy failed. Project does not exist on server\n\0") == 0) {
 			printf("Destroy failed. Project does not exit on server\n");
-		} else {
+		} else if (compareString(buff,"locked") == 0) {
+			printf("Connection failed, try again\n");
+		}else {
 			printf("Successfully destroyed project on server...\n");
 		}
+		return;
 	} else if (compareString("currentversion",action) == 0) {
 		char* total = combineString(action," \0");
 		total = combineString(total,projname);
@@ -596,6 +604,9 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 		message = combineString(message,buff);
 		if (compareString(message,"Project does not exist on server\n") == 0) {
 			printf("%s",message);
+			return;
+		} else if (compareString(message,"locked") == 0) {
+			printf("Connection failed, try again\n");
 			return;
 		}
 		int length = atoi(message);
@@ -622,6 +633,9 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 		read(sockfd,buff,sizeof(buff));
 		if(compareString(buff,"Project does not exist on server\n") == 0) {
 			printf("%s\n",buff);
+			return;
+		} else if (compareString(buff,"locked") == 0) {
+			printf("Connection failed, try again\n");
 			return;
 		}
 		mkdir(projname,0700);
@@ -690,6 +704,9 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 		read(sockfd,buff,sizeof(buff));//Read manifest length from server
 		if (compareString(buff,"Error") == 0) {
 			printf("%s does not exist on server\n",projname);
+		} else if (compareString(buff,"locked") == 0) {
+			printf("Connection failed, try again\n");
+			return;
 		}
 		int length = atoi(buff);
 		bzero(buff,sizeof(buff));
@@ -707,6 +724,7 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 			char* mitFile = combineString(projname,"/.Commit\0");
 			int mitFD = open(mitFile,O_RDONLY);
 			char* toSend = readConf(mitFD);
+			//printf("toSend: %s\n",toSend);
 			char sendLen[256];
 			memset(sendLen,'\0',256);
 			sprintf(sendLen,"%d",strlen(toSend));
@@ -733,6 +751,9 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 		read(sockfd,buff,sizeof(buff));
 		if (compareString("Project does not exist on server\n",buff) == 0) {
 			printf("%s\n",buff);
+			return;
+		} else if (compareString(buff,"locked") == 0) {
+			printf("Connection failed, try again\n");
 			return;
 		}
 		char* comText = readConf(comFD);
@@ -821,6 +842,9 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 		if (compareString(buff,"Error") == 0) {
 			printf("Project does not exist on server\n");
 			return;
+		} else if (compareString(buff,"locked") == 0) {
+			printf("Connection failed, try again\n");
+			return;
 		}
 		int length = atoi(buff);
 		char manbuff[length+1];//server manifest
@@ -869,6 +893,9 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 		read(sockfd,buff,sizeof(buff));
 		if (compareString(buff,"Error\0") == 0) {
 			printf("Project does not exist on server\n");
+			return;
+		} else if (compareString(buff,"locked") == 0) {
+			printf("Connection failed, try again\n");
 			return;
 		}
 		char* toUpgrade = upgrade(projname,updFile);
@@ -947,6 +974,9 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 		} else if (compareString(buff,"Empty") == 0) {
 			printf("Project does not have a history\n");
 			return;
+		} else if (compareString(buff,"locked") == 0) {
+			printf("Connection failed, try again\n");
+			return;
 		}
 		int len = atoi(buff);
 		char opsLen[len + 1];
@@ -966,6 +996,9 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 		read(sockfd,buff,sizeof(buff));
 		if (compareString(buff,"Error") == 0) {
 			printf("Project is already on current version or version requested is further than current version of server\n");
+			return;
+		} else if (compareString(buff,"locked") == 0) {
+			printf("Connection failed, try again\n");
 			return;
 		}
 		printf("Successfully reverted to version %s on server\n",fname);	
