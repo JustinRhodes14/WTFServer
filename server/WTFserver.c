@@ -360,12 +360,15 @@ int extractInfo(char* word) {
 }
 
 void freeLL(char* project) {//need to do this for specific project commits, 1 for commits, 2 for mutexes
+	comNode* prev = commits;
 	while(commits != NULL) {
 		if (compareString(commits->projname,project) == 0) {
 			comNode* temp = commits;
 			commits = commits->next;
+			prev->next = commits;
 			free(temp);
 		} else {
+			prev = commits;
 			commits = commits->next;
 		}
 	}
