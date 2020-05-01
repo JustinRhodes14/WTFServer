@@ -8,6 +8,7 @@
 #include <dirent.h>
 #include <limits.h>
 #include <math.h>
+#include <pthread.h>
 #include <signal.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -23,7 +24,7 @@ void destroy(char*);
 void extractMan(char*);
 int extractInfo(char*); 
 void freeLL();
-void func(int);
+void* func(void*);
 void listDirectories(char*);
 void makeDirectories(char*);
 char* readManifest(int);
@@ -40,6 +41,12 @@ int traverseCommits(char*,char*);
 void writeTo(int,char*);
 
 char* directories = "";
+
+typedef struct _mutexNode {
+	char* project;
+	pthread_mutex_t projLock;
+	struct _mutexNode* next;
+}mutexNode;
 
 typedef struct _comNode {
 	char* commit;
@@ -67,6 +74,10 @@ int sockfd, connfd, len;
 
 
 comNode* commits = NULL;
+
+mutexNode* projLocks = NULL;
+
+pthread_mutex_t repoLock;
 
 void stopSig(int signum) {
 	printf("\nStopping connection to server and client\n");
@@ -130,9 +141,14 @@ int main(int argc, char** argv)
 		printf("server acccept the client...\n"); 
 	//also make a signal handler to stop the server
 	// Function for chatting between client and server 
-	while (!(connfd < 0)) {		
-		func(connfd); 
+	pthread_mutex_init(&repoLock,NULL);
+	pthread_t threads[80];
+	int i = 0;
+	while (!(connfd < 0)) {
+		pthread_create(&threads[i],NULL,func,(void*)&connfd);		
+		//func(connfd); 
 		connfd = accept(sockfd,(SA*)&cli,&len);
+		i++;
 	}
 	// After chatting close the socket 
 	close(sockfd);
@@ -325,7 +341,7 @@ int extractInfo(char* word) {
 	return counter;
 }
 
-void freeLL() {//need to do this for specific project commits
+void freeLL(int type) {//need to do this for specific project commits, 1 for commits, 2 for mutexes
 	while(commits != NULL) {
 		comNode* temp = commits;
 		commits = commits->next;
@@ -334,8 +350,9 @@ void freeLL() {//need to do this for specific project commits
 }
 
 // Function designed for chat between client and server. 
-void func(int sockfd) 
+void* func(void* connfd) 
 { 
+	int sockfd = *(int*) connfd;
 	char buff[256];
 	bzero(buff,256);
 	read(sockfd,buff,sizeof(buff));
@@ -349,12 +366,27 @@ void func(int sockfd)
 	char* action = substring(buff,0,split);
 	char* project = substring(buff,split+1,-1);
 	if (compareString("create\0",action) == 0) {
+		pthread_mutex_lock(&repoLock);
 		int result = create(project);
 		if (result == 1) {
 			resultMessage = combineString(resultMessage, "Successfully initalized project on server and client\n");
+			if (projLocks == NULL) {
+				mutexNode* temp = (mutexNode*)malloc(sizeof(mutexNode));
+				temp->project = project;
+				temp->next = NULL;
+				pthread_mutex_init(&temp->projLock,NULL);
+			} else {
+				mutexNode* temp = (mutexNode*)malloc(sizeof(mutexNode));
+				temp->project = project;
+				temp->next = projLocks->next;
+				pthread_mutex_init(&temp->projLock,NULL);
+				projLocks->next = temp;	
+			}
+			pthread_mutex_unlock(&repoLock);
 			write(sockfd,resultMessage,strlen(resultMessage));
 		} else {
 			resultMessage = combineString(resultMessage,"Project already exists on server\n\0");
+			pthread_mutex_unlock(&repoLock);
 			write(sockfd,resultMessage,strlen(resultMessage));
 		}	
 	} else if (compareString("destroy", action) == 0) {
@@ -724,7 +756,7 @@ void func(int sockfd)
 		system("rm -r .temp\0");
 		write(sockfd,"Success",7);
 	}
-	return;
+	pthread_exit(NULL);
 }
 
 void listDirectories(char* path) {
