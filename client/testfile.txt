@@ -1,10 +1,5 @@
-3 !RM Project1/test3.txt DELETE
-Socket successfully created..
-connected to the server..
-manbuff: 3
-3 !UT Project1/test3.txt DELETE
-2 !UT Project1/test1.txt 12d77e29e0f240c122020c48a9836330ae1e92201d8b81be67e5f0963e386809
-2 !UT Project1/test2.txt 579f0966f19c1e5a312e367a0530c3d78e930b282c7abb6071a1157fffcb4ec1
-2 !UT Project1/test4.txt DELETE
-
-DONEEONDEONDEON
+4
+4 !UT Test/t2 DELETE
+3 !RM Test/t3 f2bc28e6eea43cab4ecace7ad22a8ddba95107de09fabf4572b94f626b08b848
+3 !UT Test/t4 DELETE
+2 !UT Test/t1 12d77e29e0f240c122020c48a9836330ae1e92201d8b81be67e5f0963e386809

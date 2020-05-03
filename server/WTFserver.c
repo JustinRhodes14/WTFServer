@@ -819,6 +819,7 @@ void* func(void* connfd)
 			pthread_exit(NULL);
 		}
 		system("mkdir .temp\0");
+		system("mkdir .temp/.History\0");
 		char* rolled = combineString(project,"/.History/\0");
 		char* histThing = combineString(project,"/.History\0");
 		rolled = combineString(rolled,version);
@@ -836,8 +837,11 @@ void* func(void* connfd)
 		system(com2);
 		free(com2);
 		char* com3 = combineString("cp -avr .temp/\0",project);
+		char* com4 = combineString("cp -avr .temp/.History \0",project);
 		com3 = combineString(com3," ./\0");
 		system(com3);
+		system(com4);
+		free(com4);
 		free(com3);
 		system("rm -r .temp\0");
 		write(sockfd,"Success",7);
@@ -881,7 +885,9 @@ void makeDirectories(char* dirs) {
 }
 
 int push(char* message) {
+	//printf("message: %s end\n",message);
 	message = substring(message,10,-1);//extracts sendfile: portion
+	//printf("sendfile: %s\n",message);
 	int end = 0;
 	while (message[end] != ':') {
 		end++;	

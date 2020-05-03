@@ -320,14 +320,22 @@ int commit(char* manBuff, char* project) {
 			start = i+1;
 			counter = 0;	
 			int t = tableSearch(filepath);
-			hashNode* temp = table->table[t];
-			while (temp != NULL && (hashSize != 0 && hashSize != -1)) {
-				if (compareString(temp->filepath,filepath) == 0) {
-					break;
+			hashNode* temp;
+			if (t != -1) {
+				temp = table->table[t];
+				while (temp != NULL && (hashSize != 0 && hashSize != -1)) {
+					if (compareString(temp->filepath,filepath) == 0) {
+						break;
+					}
+					temp = temp->next;
 				}
-				temp = temp->next;
+			} else {
+				temp = (hashNode*)malloc(sizeof(hashNode));
+				temp->version = clientVer;
+				temp->code = "BAD";
+				temp->filepath = "NULL";
+				temp->shacode = "NULL";
 			}
-			
 			if (hashSize != 0 && hashSize != -1) {
 				if (compareString(temp->version,version) != 0 && (hashSize != -1 && hashSize != 0)) {
 					printf("Versions don't match in one or more files, update before committing again\n");
@@ -764,6 +772,7 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 		bzero(buff,sizeof(buff));
 		read(sockfd,buff,sizeof(buff));
 		write(sockfd,comText,strlen(comText));
+		//printf("COMTEXT: %s\n",comText);
 		printf("Successfully sent commit over\n");
 		bzero(buff,sizeof(buff));
 		read(sockfd,buff,sizeof(buff));
@@ -832,6 +841,8 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 		struct dirent dir;
 		if (!(d = opendir(projname))) {
 			printf("%s does not exist on client\n",projname);
+			write(sockfd,"Error",5);
+			closedir(d);
 			return;
 		}
 		char* total = combineString(action," \0");
@@ -858,7 +869,7 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 		int success = update(projname,manbuff,ver);
 		if (success == 2) {
 			printf(".Conflict file created, fix conflicts before updating\n");
-		} else if (success == 1) {
+		} else if (success == 0) {
 			printf(".Update file successfully created with list of required updates\n");
 		}
 		return;
@@ -885,7 +896,13 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 			write(sockfd,"Error",5);
 			close(updFile);
 			return;
+		} else if (lseek(updFile,0,SEEK_END) <= 1) {
+			printf("Up to date\n");
+			write(sockfd,"Error",5);
+			close(updFile);
+			return;
 		}
+		lseek(updFile,0,SEEK_SET);
 		char* total = combineString(action," \0");
 		total = combineString(total,projname);
 		write(sockfd,total,strlen(total));
@@ -995,7 +1012,7 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 		bzero(buff,sizeof(buff));
 		read(sockfd,buff,sizeof(buff));
 		if (compareString(buff,"Error") == 0) {
-			printf("Project is already on current version or version requested is further than current version of server\n");
+			printf("Project does not exist or you requested an invalid rollback\n");
 			return;
 		} else if (compareString(buff,"locked") == 0) {
 			printf("Connection failed, try again\n");
@@ -1029,6 +1046,9 @@ void listDirectories(char* path) {
 
 char* liveHash(char* filePath) {
 	int fd = open(filePath,O_RDONLY);
+	if (fd == -1) {
+		return "DELETE";
+	}
 	char* fileText = readConf(fd);
 	char* hashedStuff = "";
 	hashedStuff = combineString(hashedStuff,compHash(fileText));
@@ -1325,7 +1345,9 @@ int update(char* project, char* serverMan, char* clientVer) {
 		return 1;//full success
 	} else {
 		int updFile = open(combineString(project,"/.Update"),O_WRONLY | O_CREAT | O_TRUNC, 00600);
+		//printf("HELLO\n");
 		for (i = i+1; i < sevLength; i++) {
+			//printf("i: %d\n sevlength: %d\n",i,sevLength);
 			if (serverMan[i] == ' ' || serverMan[i] == '\n') {
 				if (counter == 0) {
 					//printf("%s\n",version);
@@ -1346,15 +1368,20 @@ int update(char* project, char* serverMan, char* clientVer) {
 			if (counter == 4) {
 				//all data stored
 				if (tableSearch(filepath) != -1) {//found
+				//printf("HELLOi%s\n",filepath);
 					char* freshHash = liveHash(filepath);
+					//printf("wat\n");
 					int index = tableComphash(filepath);
 					hashNode* temp = table->table[index];
+					//printf("temp: %s.%d\n",temp->filepath,index);
 					while (temp != NULL) {
 						if (compareString(temp->filepath,filepath) == 0) {
 							break;
-						}	
+						}
+						//printf("gonext\n");	
 						temp = temp->next;
 					}
+					//printf("swagmoney\n");
 					if (compareString(freshHash,temp->shacode) != 0 && compareString(freshHash,shacode) != 0) {
 						if (conflict == false) {
 							flictFD = open(combineString(project,"/.Conflict"),O_WRONLY | O_CREAT | O_TRUNC,00600);
@@ -1397,6 +1424,7 @@ int update(char* project, char* serverMan, char* clientVer) {
 					
 					
 				} else {
+					printf("inhere maybe\n");
 					char* message = combineString(version," \0");
 					char* stdMes = combineString("A \0",filepath);
 					message = combineString(message,code);
