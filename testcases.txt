@@ -1,0 +1,81 @@
+Testcases.txt - All the tests we ran on our project
+
+Authors: Justin Rhodes (jgr85) & Gregorio Fuerte (grf27)
+
+
+Since there were a lot of functions to test for, we ran multiple different test cases on our project to ensure everything worked, when discussing them I will list the function and list all the testcases we ran
+
+
+./WTF checkout <project_name>
+
+1.) Client requests a project that doesn't exist on the server --> Server returns error message to client, displaying proper error message.
+2.) Client requests a project that already exists on client --> Client displays proper error message, saying project already exists.
+3.) Client requests a valid project --> Server sends file contents to client, and client properly clones existing project from server
+
+./WTF update <project_name>
+
+1.) Client tries to update a project that doesn't exist on the server or client --> Server will return error message to client, or client will display error message
+2.) File was added to server but not to client --> Client will indicate it has not seen the file and will add it to .Update file, putting proper message to STDOUT
+3.) File was removed from server but not client --> Client will indicate the file has been removed in current version, adding it to .Update file and putting proper message to STDOUT
+4.) File was modified on server and client has different version --> Client will indicate that the server has an updated version, additing it to the .Update file and putting proper message to STDOUT
+5.) .Manifest is same for server and client --> Will print out Up to Date.
+6.) .Manifest is different for server and client --> Will create .Conflict file if client had changed files, and output proper error message
+
+./WTF upgrade <project_name>
+
+1.) Client tries to upgrade a project that does not exist on server --> Error message is returned to client from server indicating so
+2.) Client calls upgrade without an existing .Update file for the project --> Client will exit and indicate you need to update before upgrading
+3.) Client calls upgrade with an empty .Update file --> Client will inform user that the project is already up to date
+4.) Client calls upgrade for a valid project and valid .Update file --> Client will request manifest from server and files, properly updating client side project and all versions/content.
+
+./WTF commit <project_name>
+
+1.) Client tries to commit to a project that doesn't exist --> Error message displayed indicating so
+2.) Adding a file to client that's not on server --> Client will indicate file isn't present on server and add it to .Commit, outputting message to STDOUT
+3.) Removing a file from client that exists on server --> Client will indicate file is to be removed on server, adding it to .Commit and outputting message to STDOUT
+4.) Modifying a file from client that's present on server --> Client will indicate file has been modified, updating shacode in .Commit file and outputting message to STDOUT
+5.) A file in servers .Manifest has a different hashcode than the clients whose version number is the same as the clients --> Error message displayed indicating user must sync with the project before committing
+
+./WTF push <project_name>
+
+1.) Client tries to push to a project that doesn't exist on server --> Error message displayed indicating project doesn't exist
+2.) Commit not present on client or server --> Error message outputted indicating so
+3.) Client sends differing .Commit file to the server --> Server will indicate that the commit is not present and user should commit
+4.) Valid push --> Server will read in what it needs from .Commit, and will update it's manifest and files accordingly
+
+./WTF create <project_name>
+
+1.) Creating a project that doesn't already exist --> Server will initialize project on both server and client, outputting a success message
+2.) Creating a project that already exists --> Server will indicate the project already exists on the server side
+
+./WTF destroy <project_name_>
+
+1.) Destroying a project that doesn't exist --> Server will indicate project doesn't exist
+2.) Destroying a project that does exist --> Server will remove the project from the repo, indicating success
+
+./WTF add <project_name> <file_path>
+
+1.) Adding a file that doesn't exist in the project folder --> Client will indicate file doesn't exist
+2.) Adding a file that does exist and isn't in .Manifest on client --> Client will add the file to the client's .Manifest with the version number, man code, filepath, and hashcode
+3.) Adding a file that is already present in the server's .Manifest on client --> Specified filepaths entry will have its man code updated to "!MD", and proper message will be displayed.
+
+./WTF remove <project_name> <file_path>
+
+1.) Removing a file that doesn't exist in project --> Client will indicate file doesn't exist
+2.) Removing a file that does exist in project --> Client will remove file from project and update it's manifest entry's man code to "!RM" and its hash code to "DELETE" priming it for deletion in commit
+
+./WTF currentversion <project_name>
+
+1.) Requesting version for a project that doesn't exist --> Server will send message to client indicating project doesn't exist
+2.) Requestion version for a project that is present in the repo --> Server will send over the currentversion of the project along with its manifest data.
+
+./WTF history <project_name>
+
+1.) Requesting history for a project that doesn't exist --> Server will send a message to client indicating project doesn't exist
+2.) Requesting history for a project that exists --> Server will send over a list of all the operations done on that project
+
+./WTF rollback <project_name> <version>
+
+1.) Requesting rollback for a project that doesn't exist --> Server will send a message to client indicating project doesn't exist
+2.) Requesting rollback for a project that exists --> Server will revert the proejct to the desired version indicating success with a message to the client
+3.) Requesting rollback for a project that exists in which the version requested does not exist or is the same --> Server will indicate invalid rollback in a message to the client

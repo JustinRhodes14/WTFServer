@@ -81,6 +81,11 @@ int main(int argc, char** argv)
 { 	
 
 	(void) signal(SIGINT,stopSig);
+	if (argc < 3 || argc > 4) {
+		printf("Error: Invalid number of arguments\n");
+		exit(0);
+	}
+	
 	if (compareString("configure\0",argv[1]) == 0) {
 		configure(argv[2],argv[3]);
 		printf("Successfully created .configure file\n");
@@ -1019,6 +1024,9 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 			return;
 		}
 		printf("Successfully reverted to version %s on server\n",fname);	
+	} else {
+		write(sockfd,"Error",5);
+		printf("Invalid inputs, look at documentation and try inputting a command again\n");
 	}
 	close(sockfd);
 }
