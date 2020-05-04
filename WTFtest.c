@@ -12,9 +12,9 @@
 #include <dirent.h>
 
 void writeTo(int,char*);
-pid_t serverInit();
+pid_t serverInit(char*);
 int forkExec(char*[]);
-int clientInit();
+int clientInit(char*);
 
 pid_t serverPID;
 pid_t clientPID;
@@ -25,7 +25,6 @@ void stopSig(int signum) {
 	exit(0);
 }
 
-pid_t serverInit();
 
 int main(int argc,char* argv[]) {
 	

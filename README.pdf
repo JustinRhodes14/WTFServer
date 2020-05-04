@@ -4,7 +4,14 @@ Authors: Justin Rhodes (jgr85) & Gregorio Fuerte (grf27)
 
 HOW IT WORKS
 
+Before anything, call make in the WTFserver directory to make all the executables for this project.
+
+
 In order to run our server, we stored our WTFserver code in the server folder, and our WTF executable in the client folder. This allowed for us to seperate the files, and enabled proper testing and version control, which is the goal of the whole project. In order to run the code, you can call it from the WTFserver working directory using ./server/WTFserver <port-number>, and then running the client executable from the working directory using ./client/WTF <parameters>
+
+If you wish to run the test client, simply call ./WTFtest <port_number> to run the tests on the desired port number
+
+An example is the following: ./WTFtest 9029 (runs server on port 9029)
 
 GENERAL
 
