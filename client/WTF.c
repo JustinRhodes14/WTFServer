@@ -1434,7 +1434,7 @@ int update(char* project, char* serverMan, char* clientVer) {
 					
 					
 				} else {
-					printf("inhere maybe\n");
+					//printf("inhere maybe\n");
 					char* message = combineString(version," \0");
 					char* stdMes = combineString("A \0",filepath);
 					message = combineString(message,code);

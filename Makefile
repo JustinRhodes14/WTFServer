@@ -7,7 +7,7 @@ all: ./client/WTF ./server/WTFserver WTFtest
 	gcc ./server/WTFserver.c -o ./server/WTFserver -lpthread
 
 WTFtest:
-	gcc WTFtest.c -o WTFtest
+	gcc WTFtest.c -o WTFtest -lz
 
 clean:
 	rm ./client/WTF; rm ./server/WTFserver; rm WTFtest;
