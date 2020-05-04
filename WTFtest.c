@@ -36,13 +36,13 @@ int main(int argc,char* argv[]) {
 	(void) signal(SIGINT,stopSig);
 	int stat;
 	serverPID = serverInit(argv[1]);
-	clientPID = clientInit(argv[1]);
 	if (clientPID != 0) {
 		printf("Client could not be initialized... try again.\n");
 		kill(serverPID,SIGINT);
 		return -1;
 	}
 	chdir("./client");
+	clientPID = clientInit(argv[1]);
 	char* initialList[] = {"WTF","create","destroyingu",NULL};
 	forkExec(initialList);
 	printf("\n");
