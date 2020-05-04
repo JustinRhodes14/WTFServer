@@ -644,8 +644,12 @@ void* func(void* connfd)
 				char fileBuf[lenFiles+1];	
 				memset(fileBuf,'\0',lenFiles+1);
 				read(sockfd,fileBuf,lenFiles);
+				//printf("fileBuf: %s\n",fileBuf);
+				printf("HELLO\n");
 				push(fileBuf);
+				printf("HELLO\n");
 				tableFree(100);
+				printf("HELLO\n");
 				close(manFD);
 				
 				int newMan = open(combineString(project,"/.Manifest\0"),O_WRONLY | O_CREAT | O_TRUNC);
@@ -886,12 +890,15 @@ void makeDirectories(char* dirs) {
 
 int push(char* message) {
 	//printf("message: %s end\n",message);
-	message = substring(message,10,-1);//extracts sendfile: portion
+	message = substring(message,9,-1);//extracts sendfile: portion
 	//printf("sendfile: %s\n",message);
 	int end = 0;
 	while (message[end] != ':') {
 		end++;	
 	}
+	int fCounter = 0;
+	int num = atoi(substring(message,0,end));
+	//printf("num: %d\n",num);
 	int length = strlen(message);
 	int i;
 	int counter = 0;
@@ -899,7 +906,11 @@ int push(char* message) {
 	int fileSize = 0;
 	int fileBytes = 0;
 	int start = end+1;
+	//printf("message: %s\n",message);
 	for (i = end + 1; i < length; i++) {
+		if (fCounter == num) {
+			return 1;
+		}
 		if (message[i] == ':') {
 			if (counter == 0) {
 				code = substring(message,start,i);
@@ -919,6 +930,7 @@ int push(char* message) {
 				writeTo(fd,substring(message,(i+1+fileSize),(i+1+fileSize+fileBytes)));
 				close(fd);
 			}
+			fCounter++;
 			counter = 0;
 			start = i+1+fileSize+fileBytes;
 			

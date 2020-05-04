@@ -730,7 +730,9 @@ void func(int sockfd,char* action, char* projname,char* fname,int version)
 		//printf("%s\n",manBuff);
 		//Manifest acquired, compare version now
 		int success = commit(manBuff,projname);//-1 on error
+		//printf("%d\n",success);
 		if (success == -1) {
+			printf("Versions in one or more files don't match, synch with the repository\n");
 			write(sockfd,"Error",5);
 			return;
 		} else {
