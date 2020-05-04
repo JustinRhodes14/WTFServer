@@ -645,11 +645,11 @@ void* func(void* connfd)
 				memset(fileBuf,'\0',lenFiles+1);
 				read(sockfd,fileBuf,lenFiles);
 				//printf("fileBuf: %s\n",fileBuf);
-				printf("HELLO\n");
+				//printf("HELLO\n");
 				push(fileBuf);
-				printf("HELLO\n");
+				//printf("HELLO\n");
 				tableFree(100);
-				printf("HELLO\n");
+				//printf("HELLO\n");
 				close(manFD);
 				
 				int newMan = open(combineString(project,"/.Manifest\0"),O_WRONLY | O_CREAT | O_TRUNC);
