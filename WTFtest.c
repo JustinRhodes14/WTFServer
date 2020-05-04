@@ -7,6 +7,14 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <dirent.h>
+
+void writeTo(int,char*);
+pid_t serverInit();
+int forkExec(char*[]);
+int clientInit();
 
 pid_t serverPID;
 pid_t clientPID;
@@ -29,18 +37,32 @@ int main() {
 		kill(serverPID,SIGINT);
 		return -1;
 	}
+
+	char* argList[] = {"WTF","create","TestProject",NULL};
+	forkExec(argList);
+	//free(argList);
+
+
+	int fd = open("TestProject/test1.txt",O_WRONLY | O_CREAT | O_TRUNC,00600);
+	writeTo(fd,"Hello there writing this stuff to a file to see what happens hopefully it don't break but lets see what it does\n");
+	close(fd);
+	char* argList2[] = {"WTF","add","TestProject","TestProject/test1.txt",NULL};
+	forkExec(argList2);
+
+
 	waitpid(serverPID,&stat,0);
 	return 0;
 }
 	
 pid_t serverInit() {
 
-	char* argList[] = {"server/WTFserver","9029",NULL};
+	char* argList[] = {"WTFserver","9029",NULL};
 	pid_t pid = fork();
 	if (pid == -1) {
 		printf("Fork failed... try again");
 		exit(0);
 	} else if (pid == 0) {
+		chdir("./server");
 		execv(argList[0],argList);	
 		exit(0);
 	} else {
@@ -51,8 +73,8 @@ pid_t serverInit() {
 
 int clientInit() {
 	
-	char* argList[] = {"client/WTF","configure","127.0.0.1","9029",NULL};
-	return forkExec(argList,0);
+	char* argList[] = {"WTF","configure","127.0.0.1","9029",NULL};
+	return forkExec(argList);
 
 }
 
@@ -64,6 +86,7 @@ int forkExec(char* argList[]) {
 		printf("Fork failed ... try again\n");
 		exit(0);
 	} else if (pid == 0) {
+		chdir("./client");
 		execv(argList[0],argList);
 		exit(0);
 	} else {
@@ -90,6 +113,17 @@ int forkExec(char* argList[]) {
 		}
 	}
 	return 0; // we made it!!
+}
+
+void writeTo(int fd, char* word) {
+
+	int bytesWritten = 0;
+	int bytestoWrite = strlen(word);
+	while (bytesWritten < bytestoWrite) {
+		bytesWritten = write(fd,word,bytestoWrite - bytesWritten);
+	}
+	close(fd);
+
 }
 
 
