@@ -9,5 +9,8 @@ all: ./client/WTF ./server/WTFserver WTFtest
 WTFtest:
 	gcc WTFtest.c -o WTFtest -lz
 
+test:
+	gcc WTFtest.c -o WTFtest -lz; gcc ./client/WTF.c -lssl -lcrypto -o ./client/WTF; gcc ./server/WTFserver.c -o ./server/WTFserver -lpthread;
+
 clean:
 	rm ./client/WTF; rm ./server/WTFserver; rm WTFtest;
